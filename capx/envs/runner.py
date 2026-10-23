@@ -23,6 +23,7 @@ from capx.envs.trial import (
     _annotate_code_blocks,
     _build_log_lines,
     _run_single_trial,
+    finalize_episode_telemetry,
 )
 from capx.utils.launch_utils import (
     TrialSummary,
@@ -109,7 +110,8 @@ def _setup_output_dir(args, config: dict[str, Any]) -> None:
         args.model = "oracle"
     if config["output_dir"]:
         parts = config["output_dir"].split("/")
-        parts.insert(-1, str(args.model).replace("/", "_"))
+        if config.get("insert_model_in_output_dir", True):
+            parts.insert(-1, str(args.model).replace("/", "_"))
         new_out_dir = "/".join(parts)
         Path(new_out_dir).mkdir(parents=True, exist_ok=True)
         config["output_dir"] = new_out_dir
@@ -142,6 +144,9 @@ def _run_headless_trials(
     trial_ids = list(range(1, config["total_trials"] + 1))
     if config.get("resume_idx") is not None:
         trial_ids = list(range(config["resume_idx"], config["total_trials"] + 1))
+    if config.get("seeds"):
+        # Explicit episode seeds (trial id == env reset seed), e.g. the dev/test split.
+        trial_ids = list(config["seeds"])
 
     # Execute trials
     if config["num_workers"] > 1:
@@ -200,9 +205,10 @@ def _run_trial_with_retries(
     multi_turn_prompt: str | None,
 ) -> TrialSummary:
     """Attempt a trial up to MAX_TRIAL_RETRIES times, retrying on timeout."""
-    for attempt in range(MAX_TRIAL_RETRIES):
+    max_retries = int(config.get("max_trial_retries", MAX_TRIAL_RETRIES))
+    for attempt in range(max_retries):
         try:
-            is_last_attempt = attempt == MAX_TRIAL_RETRIES - 1
+            is_last_attempt = attempt == max_retries - 1
             return _run_single_trial_with_timeout(
                 env=env,
                 trial=trial,
@@ -304,7 +310,20 @@ def _run_single_trial_with_timeout(
         except Exception:
             pass
 
+        tele = partial_artifacts.get("telemetry")
+        if tele is not None and tele.end_time is None and not raise_on_timeout:
+            # Keep the episode in the denominator: log why it ended and evaluate the final state.
+            if is_timeout:
+                tele.set_termination("wall_timeout", repr(exc))
+            else:
+                tele.set_termination("error", repr(exc))
+            signal.alarm(0)
+            finalize_episode_telemetry(env, tele)
+
         if not is_timeout:
+            if tele is not None and isinstance(exc, Exception):
+                print(f"Trial {trial} failed with {exc!r}; logged as an unsuccessful episode")
+                return _build_timeout_summary(trial, timeout_seconds, partial_artifacts, config, exc)
             raise
         if raise_on_timeout:
             raise TimeoutError(f"Trial {trial} timed out") from exc

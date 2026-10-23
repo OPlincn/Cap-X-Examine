@@ -135,6 +135,9 @@ class CodeExecutionEnvBase(Env):
             {"role": "user", "content": [{"type": "text", "text": self._get_complete_prompt()}]},
         ]
 
+        # Optional hook ``(name, fn) -> fn`` used by the harness to count/guard tool calls
+        self.tool_wrapper: Callable[[str, Callable[..., Any]], Callable[..., Any]] | None = None
+
         # Persistent execution namespace to retain variables across steps
         self._exec_globals: dict[str, Any] = {}
         self._init_exec_globals()
@@ -178,7 +181,7 @@ class CodeExecutionEnvBase(Env):
         # Ensure API helper functions remain bound/current
         for api in self._apis.values():
             for fn_name, fn in api.functions().items():
-                self._exec_globals[fn_name] = fn
+                self._exec_globals[fn_name] = self._bind_tool(fn_name, fn)
 
         stdout_buffer = io.StringIO()
         tee_out = Tee(sys.stdout, stdout_buffer)
@@ -221,8 +224,12 @@ class CodeExecutionEnvBase(Env):
         # Bind helper functions from APIs into the global namespace for convenience
         for api in self._apis.values():
             for fn_name, fn in api.functions().items():
-                g[fn_name] = fn
+                g[fn_name] = self._bind_tool(fn_name, fn)
         self._exec_globals = g
+
+    def _bind_tool(self, name: str, fn: Callable[..., Any]) -> Callable[..., Any]:
+        wrapper = getattr(self, "tool_wrapper", None)
+        return wrapper(name, fn) if wrapper is not None else fn
 
     def _build_low_level(
         self, src: Env | str, privileged: bool = False, enable_render: bool = True, viser_debug: bool = False

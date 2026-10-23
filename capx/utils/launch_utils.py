@@ -22,6 +22,7 @@ from PIL import Image
 
 from capx.envs.configs.instantiate import instantiate
 from capx.envs.configs.loader import DictLoader
+from capx.envs.telemetry import EpisodeBudget
 
 # Re-export LLM client symbols for backward compatibility
 from capx.llm.client import (  # noqa: F401
@@ -105,6 +106,9 @@ def _load_config(args: LaunchArgs) -> tuple[Any, dict[str, Any], list]:
     # (CLI args take priority; YAML fills in when CLI uses defaults)
     _CLI_DEFAULTS = {
         "server_url": "http://127.0.0.1:8110/chat/completions",
+        "model": "google/gemini-3.1-pro-preview",
+        "temperature": 1.0,
+        "max_tokens": 2048 * 10,
         "visual_differencing_model": "google/gemini-3.1-pro-preview",
         "visual_differencing_model_server_url": "http://127.0.0.1:8110/chat/completions",
         "visual_differencing_model_api_key": None,
@@ -113,6 +117,26 @@ def _load_config(args: LaunchArgs) -> tuple[Any, dict[str, Any], list]:
         current_value = getattr(args, field, cli_default)
         if current_value == cli_default and field in configs_dict:
             setattr(args, field, configs_dict[field])
+
+    # Credentials come from the environment, never from YAML files or CLI logs.
+    env_key = os.environ.get("CAPX_API_KEY")
+    if env_key:
+        if args.api_key is None:
+            args.api_key = env_key
+        if args.visual_differencing_model_api_key is None:
+            args.visual_differencing_model_api_key = env_key
+
+    budget_cfg = dict(configs_dict.get("budget", {}) or {})
+    for field in ("max_turns", "max_model_calls", "max_total_tokens", "max_sim_steps", "max_wall_time_s"):
+        if getattr(args, field, None) is not None:
+            budget_cfg[field] = getattr(args, field)
+    budget = EpisodeBudget(**budget_cfg)
+
+    seeds = getattr(args, "seeds", None)
+    if seeds is not None:
+        seeds = [int(x) for x in str(seeds).split(",") if x.strip() != ""]
+    else:
+        seeds = configs_dict.get("seeds", None)
 
     # Build merged config dict (CLI args override YAML)
     merged_config = {
@@ -157,6 +181,12 @@ def _load_config(args: LaunchArgs) -> tuple[Any, dict[str, Any], list]:
         if getattr(args, "web_ui_port", None) is not None
         else configs_dict.get("web_ui_port", 8200),
         "save_multiturn_prompts": configs_dict.get("save_multiturn_prompts", False),
+        "task_name": configs_dict.get("task_name", Path(config_path).stem),
+        "harness_mode": getattr(args, "harness_mode", None) or configs_dict.get("harness_mode", "baseline"),
+        "budget": budget,
+        "seeds": seeds,
+        "insert_model_in_output_dir": configs_dict.get("insert_model_in_output_dir", True),
+        "max_trial_retries": configs_dict.get("max_trial_retries", 3),
     }
 
     return env_factory, merged_config, api_servers

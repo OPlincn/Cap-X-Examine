@@ -122,6 +122,28 @@ class LaunchArgs:
     web_ui_port: int | None = None
     """Port for the web UI server (default 8200)."""
 
+    # Paired harness evaluation (budgets, telemetry, seeds)
+    harness_mode: str | None = None
+    """Harness condition: baseline, ours or ablation. Overrides the YAML value."""
+
+    seeds: str | None = None
+    """Comma-separated episode seeds to run (e.g. "0,1,2"). Overrides trials/resume_idx."""
+
+    max_turns: int | None = None
+    """Per-episode cap on code executions. Overrides the YAML budget."""
+
+    max_model_calls: int | None = None
+    """Per-episode cap on model calls (coding agent + VDM). Overrides the YAML budget."""
+
+    max_total_tokens: int | None = None
+    """Per-episode cap on input+output tokens (coding agent + VDM). Overrides the YAML budget."""
+
+    max_sim_steps: int | None = None
+    """Per-episode cap on simulator steps. Overrides the YAML budget."""
+
+    max_wall_time_s: int | None = None
+    """Per-episode wall-clock cap in seconds. Overrides the YAML budget."""
+
 
 # ---------------------------------------------------------------------------
 # Web UI
