@@ -1,0 +1,143 @@
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+# Segment the brown spill
+masks = segment_sam3_text_prompt(rgb, text_prompt="brown spill")
+if len(masks) == 0:
+    masks = segment_sam3_text_prompt(rgb, text_prompt="brown stain")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+
+# Backproject masked pixels to 3D in camera frame
+ys, xs = np.nonzero(mask)
+z = depth[ys, xs]
+valid = z > 0
+xs, ys, z = xs[valid], ys[valid], z[valid]
+
+fx, fy = K[0, 0], K[1, 1]
+cx, cy = K[0, 2], K[1, 2]
+X = (xs - cx) * z / fx
+Y = (ys - cy) * z / fy
+Z = z
+pts_cam = np.stack([X, Y, Z], axis=1)
+
+# Transform to world frame
+pts_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)
+pts_world = (cam_pose @ pts_h.T).T[:, :3]
+
+# Spill extents in world frame
+x_min, x_max = pts_world[:, 0].min(), pts_world[:, 0].max()
+y_min, y_max = pts_world[:, 1].min(), pts_world[:, 1].max()
+print("Spill extents x:", x_min, x_max, "y:", y_min, y_max)
+
+# Shrink bounds slightly to stay within spill
+margin_x = 0.1 * (x_max - x_min)
+margin_y = 0.1 * (y_max - y_min)
+x_lo, x_hi = x_min + margin_x, x_max - margin_x
+y_lo, y_hi = y_min + margin_y, y_max - margin_y
+
+quat = np.array([0.0, 0.0, 1.0, 0.0])  # downward-facing wxyz
+
+# Approach above spill center first
+cx_w = (x_lo + x_hi) / 2
+cy_w = (y_lo + y_hi) / 2
+approach_z = 0.1
+joints = solve_ik(np.array([cx_w, cy_w, approach_z]), quat)
+move_to_joints(joints)
+
+# Lower to table height
+joints = solve_ik(np.array([cx_w, cy_w, 0.0]), quat)
+move_to_joints(joints)
+
+# Wiping: small zig-zag motions within spill bounds
+n_steps = 5
+xs_wipe = np.linspace(x_lo, x_hi, n_steps)
+ys_wipe = np.linspace(y_lo, y_hi, n_steps)
+for i in range(n_steps):
+    y_target = ys_wipe[i] if i % 2 == 0 else ys_wipe[n_steps - 1 - i]
+    for x_target in xs_wipe:
+        joints = solve_ik(np.array([x_target, y_target, 0.0]), quat)
+        move_to_joints(joints)
+
+# Lift up after wiping
+joints = solve_ik(np.array([cx_w, cy_w, approach_z]), quat)
+move_to_joints(joints)
+print("Wiping complete")
+
+# Code block 1
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+# Segment the remaining brown spill
+masks = segment_sam3_text_prompt(rgb, text_prompt="brown spill")
+if len(masks) == 0:
+    masks = segment_sam3_text_prompt(rgb, text_prompt="brown stain")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+
+ys, xs = np.nonzero(mask)
+z = depth[ys, xs]
+valid = z > 0
+xs, ys, z = xs[valid], ys[valid], z[valid]
+
+fx, fy = K[0, 0], K[1, 1]
+cx, cy = K[0, 2], K[1, 2]
+X = (xs - cx) * z / fx
+Y = (ys - cy) * z / fy
+Z = z
+pts_cam = np.stack([X, Y, Z], axis=1)
+
+pts_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)
+pts_world = (cam_pose @ pts_h.T).T[:, :3]
+
+x_min, x_max = pts_world[:, 0].min(), pts_world[:, 0].max()
+y_min, y_max = pts_world[:, 1].min(), pts_world[:, 1].max()
+print("Residual spill extents x:", x_min, x_max, "y:", y_min, y_max)
+
+# Small margin to stay within residual spill
+margin_x = 0.05 * (x_max - x_min)
+margin_y = 0.05 * (y_max - y_min)
+x_lo, x_hi = x_min + margin_x, x_max - margin_x
+y_lo, y_hi = y_min + margin_y, y_max - margin_y
+
+quat = np.array([0.0, 0.0, 1.0, 0.0])  # downward-facing wxyz
+
+cx_w = (x_lo + x_hi) / 2
+cy_w = (y_lo + y_hi) / 2
+approach_z = 0.1
+
+# Approach above residual spill
+joints = solve_ik(np.array([cx_w, cy_w, approach_z]), quat)
+move_to_joints(joints)
+
+# Lower to table
+joints = solve_ik(np.array([cx_w, cy_w, 0.0]), quat)
+move_to_joints(joints)
+
+# Fine wiping over residual spill with small zig-zag
+n_steps = 4
+xs_wipe = np.linspace(x_lo, x_hi, n_steps)
+ys_wipe = np.linspace(y_lo, y_hi, n_steps)
+for i in range(n_steps):
+    y_target = ys_wipe[i] if i % 2 == 0 else ys_wipe[n_steps - 1 - i]
+    for x_target in xs_wipe:
+        joints = solve_ik(np.array([x_target, y_target, 0.0]), quat)
+        move_to_joints(joints)
+
+# Lift up
+joints = solve_ik(np.array([cx_w, cy_w, approach_z]), quat)
+move_to_joints(joints)
+print("Residual wiping complete")

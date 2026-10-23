@@ -1,0 +1,515 @@
+[
+  {
+    "task": "cube_lifting",
+    "seed": 0,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 8,
+    "tags": [],
+    "wasted_vdm_tokens": 0,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": true,
+        "sim_steps": 211,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 1,
+        "exec_ok": true,
+        "sim_steps": 135,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 2,
+        "exec_ok": true,
+        "sim_steps": 110,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 3,
+        "exec_ok": true,
+        "sim_steps": 117,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 4,
+        "exec_ok": true,
+        "sim_steps": 111,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 5,
+        "exec_ok": true,
+        "sim_steps": 168,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 6,
+        "exec_ok": true,
+        "sim_steps": 158,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 7,
+        "exec_ok": true,
+        "sim_steps": 117,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": true,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "cube_lifting",
+    "seed": 1,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 4,
+    "tags": [
+      "C:vdm_on_zero_motion_crash x1"
+    ],
+    "wasted_vdm_tokens": 2591,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": true,
+        "sim_steps": 204,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 1,
+        "exec_ok": false,
+        "sim_steps": 0,
+        "exception": "AssertionError",
+        "zero_motion_crash": true,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 2,
+        "exec_ok": true,
+        "sim_steps": 320,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 3,
+        "exec_ok": true,
+        "sim_steps": 153,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "cube_lifting",
+    "seed": 2,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 5,
+    "tags": [
+      "C:vdm_on_zero_motion_crash x2",
+      "C:repeated_exception x1"
+    ],
+    "wasted_vdm_tokens": 5118,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": true,
+        "sim_steps": 213,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 1,
+        "exec_ok": false,
+        "sim_steps": 0,
+        "exception": "AssertionError",
+        "zero_motion_crash": true,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 2,
+        "exec_ok": false,
+        "sim_steps": 0,
+        "exception": "AssertionError",
+        "zero_motion_crash": true,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 3,
+        "exec_ok": true,
+        "sim_steps": 131,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 4,
+        "exec_ok": true,
+        "sim_steps": 172,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "cube_restack",
+    "seed": 0,
+    "mode": "baseline",
+    "success": false,
+    "termination": "finish",
+    "turns": 1,
+    "tags": [
+      "A:premature_finish",
+      "A:vdm_false_completion",
+      "C:vdm_on_zero_motion_crash x1"
+    ],
+    "wasted_vdm_tokens": 2531,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": false,
+        "sim_steps": 0,
+        "exception": "SyntaxError: unterminated string literal (detected at line 48)",
+        "zero_motion_crash": true,
+        "motion_then_crash": false,
+        "vdm_claims_completion": true,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "cube_restack",
+    "seed": 1,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 4,
+    "tags": [
+      "C:vdm_on_zero_motion_crash x1"
+    ],
+    "wasted_vdm_tokens": 2582,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": false,
+        "sim_steps": 0,
+        "exception": "SyntaxError: unterminated string literal (detected at line 47)",
+        "zero_motion_crash": true,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 1,
+        "exec_ok": true,
+        "sim_steps": 355,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 2,
+        "exec_ok": true,
+        "sim_steps": 225,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": true,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 3,
+        "exec_ok": true,
+        "sim_steps": 30,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": true,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "cube_restack",
+    "seed": 2,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 2,
+    "tags": [
+      "C:vdm_on_zero_motion_crash x1"
+    ],
+    "wasted_vdm_tokens": 2537,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": false,
+        "sim_steps": 0,
+        "exception": "SyntaxError: invalid decimal literal",
+        "zero_motion_crash": true,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 1,
+        "exec_ok": true,
+        "sim_steps": 471,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "cube_stack",
+    "seed": 0,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 1,
+    "tags": [],
+    "wasted_vdm_tokens": 0,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": true,
+        "sim_steps": 215,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": true,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "cube_stack",
+    "seed": 1,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 3,
+    "tags": [
+      "C:vdm_on_zero_motion_crash x1"
+    ],
+    "wasted_vdm_tokens": 2598,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": false,
+        "sim_steps": 0,
+        "exception": "SyntaxError: invalid decimal literal",
+        "zero_motion_crash": true,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 1,
+        "exec_ok": true,
+        "sim_steps": 216,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 2,
+        "exec_ok": true,
+        "sim_steps": 30,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": true,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "cube_stack",
+    "seed": 2,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 2,
+    "tags": [
+      "C:vdm_on_zero_motion_crash x1"
+    ],
+    "wasted_vdm_tokens": 2569,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": false,
+        "sim_steps": 0,
+        "exception": "SyntaxError: unterminated string literal (detected at line 49)",
+        "zero_motion_crash": true,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 1,
+        "exec_ok": true,
+        "sim_steps": 268,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "spill_wipe",
+    "seed": 0,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 1,
+    "tags": [],
+    "wasted_vdm_tokens": 0,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": true,
+        "sim_steps": 510,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": true,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "spill_wipe",
+    "seed": 1,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 2,
+    "tags": [
+      "C:vdm_on_zero_motion_crash x1"
+    ],
+    "wasted_vdm_tokens": 2659,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": false,
+        "sim_steps": 0,
+        "exception": "SyntaxError: invalid syntax",
+        "zero_motion_crash": true,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 1,
+        "exec_ok": true,
+        "sim_steps": 190,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": true,
+        "decision_after": "finish"
+      }
+    ]
+  },
+  {
+    "task": "spill_wipe",
+    "seed": 2,
+    "mode": "baseline",
+    "success": true,
+    "termination": "finish",
+    "turns": 2,
+    "tags": [],
+    "wasted_vdm_tokens": 0,
+    "per_turn": [
+      {
+        "turn": 0,
+        "exec_ok": true,
+        "sim_steps": 280,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "regenerate"
+      },
+      {
+        "turn": 1,
+        "exec_ok": true,
+        "sim_steps": 190,
+        "exception": null,
+        "zero_motion_crash": false,
+        "motion_then_crash": false,
+        "vdm_claims_completion": false,
+        "decision_after": "finish"
+      }
+    ]
+  }
+]

@@ -1,0 +1,489 @@
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python /home/oplin/PythonProjects/cap-task/cap-x/capx/third_party/robosuite/robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:32)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly, otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:42)
+R1Pro not installed, skipping R1Pro APIs
+LIBERO not installed!
+R1Pro not installed!
+API server on 127.0.0.1:8114 already running, skipping
+API server on 127.0.0.1:8115 already running, skipping
+API server on 127.0.0.1:8116 already running, skipping
+[robosuite INFO] Loading controller configuration from: capx/integrations/robosuite/controllers/config/robots/panda_joint_ctrl.json (composite_controller_factory.py:121)
+init franka control api
+init grasp net plan fn
+init sam3 seg fn
+Running Trials:   0%|          | 0/1 [00:00<?, ?it/s]Time taken to query model: 10.92 seconds
+Time taken to query model: 5.43 seconds
+done [ 0.56348083 -0.0162629  -0.10122836]
+Time taken to query model: 12.78 seconds
+Time taken to query model: 4.88 seconds
+Model chose to regenerate code
+Code block 1 done
+Number of code blocks: 2
+Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 13, in <module>
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/telemetry.py", line 317, in wrapper
+    return fn(*a, **kw)
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/integrations/franka/control_reduced.py", line 434, in plan_grasp
+    vtf.SE3.from_matrix(self._env.grasp_sample) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))
+  File "/home/oplin/PythonProjects/cap-task/cap-x/.venv/lib/python3.10/site-packages/viser/transforms/_se3.py", line 92, in from_matrix
+    assert matrix.shape[-2:] == (4, 4) or matrix.shape[-2:] == (3, 4)
+AssertionError
+Time taken to query model: 10.06 seconds
+Time taken to query model: 6.45 seconds
+Model chose to regenerate code
+Code block 2 done
+Number of code blocks: 3
+Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 13, in <module>
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/telemetry.py", line 317, in wrapper
+    return fn(*a, **kw)
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/integrations/franka/control_reduced.py", line 434, in plan_grasp
+    vtf.SE3.from_matrix(self._env.grasp_sample) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))
+  File "/home/oplin/PythonProjects/cap-task/cap-x/.venv/lib/python3.10/site-packages/viser/transforms/_se3.py", line 92, in from_matrix
+    assert matrix.shape[-2:] == (4, 4) or matrix.shape[-2:] == (3, 4)
+AssertionError
+Time taken to query model: 9.84 seconds
+Time taken to query model: 6.04 seconds
+Model chose to regenerate code
+Code block 3 done
+Number of code blocks: 4
+num grasps 3 shape (3, 4, 4)
+T_cam shape (4, 4)
+[[ 0.73919893  0.19416301 -0.64489199 -0.0018026 ]
+ [-0.61347998  0.58922572 -0.52579023 -0.10008471]
+ [ 0.27789793  0.7842919   0.55467013  0.51473046]
+ [ 0.          0.          0.          1.        ]]
+grasp pos [ 0.56486307 -0.0018026   0.09739062] quat [-0.36905285  0.220933    0.67888253 -0.59506899]
+done [ 0.56486307 -0.0018026   0.08739062]
+Time taken to query model: 11.85 seconds
+Time taken to query model: 4.01 seconds
+Model chose to regenerate code
+Code block 4 done
+Number of code blocks: 5
+cube center world [ 0.59290419 -0.01189182 -0.08983022]
+done [ 0.59290419 -0.01189182 -0.08983022]
+Time taken to query model: 5.57 seconds
+Time taken to query model: 0.83 seconds
+Model chose to finish
+Code blocks done
+Saved interaction video to logs/dev_baseline/cube_lifting/seed_2/trial_02_sandboxrc_0_reward_1.000_taskcompleted_1/video_turn_00.mp4 (107 frames)
+Saved interaction video to logs/dev_baseline/cube_lifting/seed_2/trial_02_sandboxrc_0_reward_1.000_taskcompleted_1/video_turn_03.mp4 (65 frames)
+Saved interaction video to logs/dev_baseline/cube_lifting/seed_2/trial_02_sandboxrc_0_reward_1.000_taskcompleted_1/video_turn_04.mp4 (86 frames)
+Saved interaction video to logs/dev_baseline/cube_lifting/seed_2/trial_02_sandboxrc_0_reward_1.000_taskcompleted_1/video_combined.mp4 (259 frames)
+Trial 2 took 151.00 seconds
+Running Trials: 100%|██████████| 1/1 [02:31<00:00, 151.16s/it]Running Trials: 100%|██████████| 1/1 [02:31<00:00, 151.16s/it]
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+T_cam = grasp_poses[best_idx]
+T_world = ext @ T_cam
+
+pos = T_world[:3, 3]
+R = T_world[:3, :3]
+
+# Convert rotation to quaternion (wxyz)
+def rot_to_quat(R):
+    t = np.trace(R)
+    if t > 0:
+        s = np.sqrt(t + 1.0) * 2
+        w = 0.25 * s
+        x = (R[2,1] - R[1,2]) / s
+        y = (R[0,2] - R[2,0]) / s
+        z = (R[1,0] - R[0,1]) / s
+    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:
+        s = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+        w = (R[2,1] - R[1,2]) / s
+        x = 0.25 * s
+        y = (R[0,1] + R[1,0]) / s
+        z = (R[0,2] + R[2,0]) / s
+    elif R[1,1] > R[2,2]:
+        s = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+        w = (R[0,2] - R[2,0]) / s
+        x = (R[0,1] + R[1,0]) / s
+        y = 0.25 * s
+        z = (R[1,2] + R[2,1]) / s
+    else:
+        s = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+        w = (R[1,0] - R[0,1]) / s
+        x = (R[0,2] + R[2,0]) / s
+        y = (R[1,2] + R[2,1]) / s
+        z = 0.25 * s
+    return np.array([w, x, y, z])
+
+quat = rot_to_quat(R)
+
+# Pre-grasp above
+pre = pos.copy()
+pre[2] += 0.1
+open_gripper()
+joints = solve_ik(pre, quat)
+move_to_joints(joints)
+
+# Move down to grasp
+joints = solve_ik(pos, quat)
+move_to_joints(joints)
+
+close_gripper()
+
+# Lift
+lift = pos.copy()
+lift[2] += 0.2
+joints = solve_ik(lift, quat)
+move_to_joints(joints)
+
+print("done", pos)
+
+# Code block 1
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+T_cam = grasp_poses[best_idx]
+T_world = ext @ T_cam
+
+pos = T_world[:3, 3]
+R = T_world[:3, :3]
+
+def rot_to_quat(R):
+    t = np.trace(R)
+    if t > 0:
+        s = np.sqrt(t + 1.0) * 2
+        w = 0.25 * s
+        x = (R[2,1] - R[1,2]) / s
+        y = (R[0,2] - R[2,0]) / s
+        z = (R[1,0] - R[0,1]) / s
+    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:
+        s = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+        w = (R[2,1] - R[1,2]) / s
+        x = 0.25 * s
+        y = (R[0,1] + R[1,0]) / s
+        z = (R[0,2] + R[2,0]) / s
+    elif R[1,1] > R[2,2]:
+        s = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+        w = (R[0,2] - R[2,0]) / s
+        x = (R[0,1] + R[1,0]) / s
+        y = 0.25 * s
+        z = (R[1,2] + R[2,1]) / s
+    else:
+        s = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+        w = (R[1,0] - R[0,1]) / s
+        x = (R[0,2] + R[2,0]) / s
+        y = (R[1,2] + R[2,1]) / s
+        z = 0.25 * s
+    return np.array([w, x, y, z])
+
+quat = rot_to_quat(R)
+
+# Pre-grasp above
+pre = pos.copy()
+pre[2] += 0.15
+open_gripper()
+joints = solve_ik(pre, quat)
+move_to_joints(joints)
+
+# Move down to grasp (slightly deeper)
+grasp_pos = pos.copy()
+grasp_pos[2] -= 0.01
+joints = solve_ik(grasp_pos, quat)
+move_to_joints(joints)
+
+close_gripper()
+
+# Lift
+lift = grasp_pos.copy()
+lift[2] += 0.25
+joints = solve_ik(lift, quat)
+move_to_joints(joints)
+
+print("done", grasp_pos)
+
+# Code block 2
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+print("num grasps", len(grasp_poses), "shape", grasp_poses.shape)
+best_idx = int(np.argmax(grasp_scores))
+T_cam = grasp_poses[best_idx]
+print("T_cam shape", T_cam.shape)
+print(T_cam)
+T_world = ext @ T_cam
+
+pos = T_world[:3, 3]
+R = T_world[:3, :3]
+
+def rot_to_quat(R):
+    t = np.trace(R)
+    if t > 0:
+        s = np.sqrt(t + 1.0) * 2
+        w = 0.25 * s
+        x = (R[2,1] - R[1,2]) / s
+        y = (R[0,2] - R[2,0]) / s
+        z = (R[1,0] - R[0,1]) / s
+    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:
+        s = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+        w = (R[2,1] - R[1,2]) / s
+        x = 0.25 * s
+        y = (R[0,1] + R[1,0]) / s
+        z = (R[0,2] + R[2,0]) / s
+    elif R[1,1] > R[2,2]:
+        s = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+        w = (R[0,2] - R[2,0]) / s
+        x = (R[0,1] + R[1,0]) / s
+        y = 0.25 * s
+        z = (R[1,2] + R[2,1]) / s
+    else:
+        s = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+        w = (R[1,0] - R[0,1]) / s
+        x = (R[0,2] + R[2,0]) / s
+        y = (R[1,2] + R[2,1]) / s
+        z = 0.25 * s
+    return np.array([w, x, y, z])
+
+quat = rot_to_quat(R)
+print("grasp pos", pos, "quat", quat)
+
+pre = pos.copy()
+pre[2] += 0.15
+open_gripper()
+joints = solve_ik(pre, quat)
+move_to_joints(joints)
+
+grasp_pos = pos.copy()
+grasp_pos[2] -= 0.01
+joints = solve_ik(grasp_pos, quat)
+move_to_joints(joints)
+
+close_gripper()
+
+lift = grasp_pos.copy()
+lift[2] += 0.25
+joints = solve_ik(lift, quat)
+move_to_joints(joints)
+
+print("done", grasp_pos)
+
+# Code block 3
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+print("num grasps", len(grasp_poses), "shape", grasp_poses.shape)
+best_idx = int(np.argmax(grasp_scores))
+T_cam = grasp_poses[best_idx]
+print("T_cam shape", T_cam.shape)
+print(T_cam)
+T_world = ext @ T_cam
+
+pos = T_world[:3, 3]
+R = T_world[:3, :3]
+
+def rot_to_quat(R):
+    t = np.trace(R)
+    if t > 0:
+        s = np.sqrt(t + 1.0) * 2
+        w = 0.25 * s
+        x = (R[2,1] - R[1,2]) / s
+        y = (R[0,2] - R[2,0]) / s
+        z = (R[1,0] - R[0,1]) / s
+    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:
+        s = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+        w = (R[2,1] - R[1,2]) / s
+        x = 0.25 * s
+        y = (R[0,1] + R[1,0]) / s
+        z = (R[0,2] + R[2,0]) / s
+    elif R[1,1] > R[2,2]:
+        s = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+        w = (R[0,2] - R[2,0]) / s
+        x = (R[0,1] + R[1,0]) / s
+        y = 0.25 * s
+        z = (R[1,2] + R[2,1]) / s
+    else:
+        s = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+        w = (R[1,0] - R[0,1]) / s
+        x = (R[0,2] + R[2,0]) / s
+        y = (R[1,2] + R[2,1]) / s
+        z = 0.25 * s
+    return np.array([w, x, y, z])
+
+quat = rot_to_quat(R)
+print("grasp pos", pos, "quat", quat)
+
+pre = pos.copy()
+pre[2] += 0.15
+open_gripper()
+joints = solve_ik(pre, quat)
+move_to_joints(joints)
+
+grasp_pos = pos.copy()
+grasp_pos[2] -= 0.01
+joints = solve_ik(grasp_pos, quat)
+move_to_joints(joints)
+
+close_gripper()
+
+lift = grasp_pos.copy()
+lift[2] += 0.25
+joints = solve_ik(lift, quat)
+move_to_joints(joints)
+
+print("done", grasp_pos)
+
+# Code block 4
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+# Compute cube center in world frame from mask + depth
+ys, xs = np.where(mask > 0)
+zs = depth[ys, xs]
+valid = zs > 0
+xs, ys, zs = xs[valid], ys[valid], zs[valid]
+fx, fy = K[0,0], K[1,1]
+cx, cy = K[0,2], K[1,2]
+X = (xs - cx) * zs / fx
+Y = (ys - cy) * zs / fy
+Z = zs
+pts_cam = np.stack([X, Y, Z], axis=1)
+pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0],1))], axis=1)
+pts_world = (ext @ pts_cam_h.T).T[:, :3]
+
+center = pts_world.mean(axis=0)
+print("cube center world", center)
+
+# Top-down grasp orientation: gripper pointing down (z axis of hand = -world z)
+# Franka hand default: approach along +z of hand. We want hand z pointing down.
+# Quaternion for 180 deg rotation about x: w=0, x=1, y=0, z=0
+quat = np.array([0.0, 1.0, 0.0, 0.0])
+
+# Pre-grasp above cube
+pre = center.copy()
+pre[2] += 0.15
+open_gripper()
+joints = solve_ik(pre, quat)
+move_to_joints(joints)
+
+# Move down to grasp at cube center height
+grasp_pos = center.copy()
+grasp_pos[2] += 0.0
+joints = solve_ik(grasp_pos, quat)
+move_to_joints(joints)
+
+close_gripper()
+
+# Lift
+lift = grasp_pos.copy()
+lift[2] += 0.25
+joints = solve_ik(lift, quat)
+move_to_joints(joints)
+
+print("done", grasp_pos)
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: cube center world [ 0.59290419 -0.01189182 -0.08983022]
+done [ 0.59290419 -0.01189182 -0.08983022]
+
+  Stderr: Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 13, in <module>
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/telemetry.py", line 317, in wrapper
+    return fn(*a, **kw)
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/integrations/franka/control_reduced.py", line 434, in plan_grasp
+    vtf.SE3.from_matrix(self._env.grasp_sample) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))
+  File "/home/oplin/PythonProjects/cap-task/cap-x/.venv/lib/python3.10/site-packages/viser/transforms/_se3.py", line 92, in from_matrix
+    assert matrix.shape[-2:] == (4, 4) or matrix.shape[-2:] == (3, 4)
+AssertionError
+
+
+Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 13, in <module>
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/telemetry.py", line 317, in wrapper
+    return fn(*a, **kw)
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/integrations/franka/control_reduced.py", line 434, in plan_grasp
+    vtf.SE3.from_matrix(self._env.grasp_sample) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))
+  File "/home/oplin/PythonProjects/cap-task/cap-x/.venv/lib/python3.10/site-packages/viser/transforms/_se3.py", line 92, in from_matrix
+    assert matrix.shape[-2:] == (4, 4) or matrix.shape[-2:] == (3, 4)
+AssertionError
+
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 4
+  Num Finishes: 1
+  Num Code Blocks: 5
+----------------------------------------------------------------------------------------------------
+Code saved to logs/dev_baseline/cube_lifting/seed_2/trial_02_sandboxrc_0_reward_1.000_taskcompleted_1/code.py
+
+Summary Statistics:
+Model: deepseek-v4.1-flash-1017
+Visual Differencing Model: qwen3.8-flash
+Config Path: env_configs/harness_eval/cube_lifting.yaml
+Git Commit: e6c2512 (Dirty: True)
+Total number of trials: 1
+Code generation success rate / Average reward / Task completed: 
+1.000/1.000/1
+Average code blocks: 5.000
+Average regenerations: 4.000
+Average finishes: 1.000
+Elapsed time: 152.13 seconds

@@ -1,0 +1,120 @@
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python /home/oplin/PythonProjects/cap-task/cap-x/capx/third_party/robosuite/robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:32)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly, otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:42)
+R1Pro not installed, skipping R1Pro APIs
+LIBERO not installed!
+R1Pro not installed!
+API server on 127.0.0.1:8114 already running, skipping
+API server on 127.0.0.1:8116 already running, skipping
+[robosuite INFO] Loading controller configuration from: capx/integrations/robosuite/controllers/config/robots/panda_joint_ctrl.json (composite_controller_factory.py:121)
+init franka control api
+init grasp net plan fn
+init sam3 seg fn
+Running Trials:   0%|          | 0/1 [00:00<?, ?it/s]Time taken to query model: 14.76 seconds
+Time taken to query model: 5.99 seconds
+bounds 0.38591084370305384 0.6092008083389784 -0.19115476356252098 0.12577819304444582
+wiping done
+Time taken to query model: 10.66 seconds
+Time taken to query model: 2.35 seconds
+Model chose to finish
+Code blocks done
+Saved interaction video to logs/dev_baseline/spill_wipe/seed_0/trial_00_sandboxrc_0_reward_1.000_taskcompleted_1/video_turn_00.mp4 (51 frames)
+Saved interaction video to logs/dev_baseline/spill_wipe/seed_0/trial_00_sandboxrc_0_reward_1.000_taskcompleted_1/video_combined.mp4 (52 frames)
+Trial 0 took 44.51 seconds
+Running Trials: 100%|██████████| 1/1 [00:44<00:00, 44.66s/it]Running Trials: 100%|██████████| 1/1 [00:44<00:00, 44.66s/it]
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="brown spill")
+if len(masks) == 0:
+    print("No spill found")
+else:
+    best = max(masks, key=lambda d: d["score"])
+    mask = best["mask"]
+    ys, xs = np.where(mask)
+    # backproject masked pixels to world
+    zs = depth[ys, xs]
+    valid = zs > 0
+    xs, ys, zs = xs[valid], ys[valid], zs[valid]
+    fx, fy = K[0, 0], K[1, 1]
+    cx, cy = K[0, 2], K[1, 2]
+    xc = (xs - cx) * zs / fx
+    yc = (ys - cy) * zs / fy
+    pts_cam = np.stack([xc, yc, zs, np.ones_like(zs)], axis=1)
+    pts_world = (cam_ext @ pts_cam.T).T[:, :3]
+    # filter near table
+    pts_world = pts_world[pts_world[:, 2] < 0.05]
+    xmin, xmax = pts_world[:, 0].min(), pts_world[:, 0].max()
+    ymin, ymax = pts_world[:, 1].min(), pts_world[:, 1].max()
+    print("bounds", xmin, xmax, ymin, ymax)
+
+    quat = np.array([0.0, 0.0, 1.0, 0.0])
+    z = 0.0
+
+    # small margin inward
+    mx = (xmax - xmin) * 0.1
+    my = (ymax - ymin) * 0.1
+    xmin += mx; xmax -= mx; ymin += my; ymax -= my
+
+    # build zigzag path with small steps
+    n_strips = 5
+    ys_path = np.linspace(ymin, ymax, n_strips)
+    step = 0.02
+    path = []
+    for i, y in enumerate(ys_path):
+        xs_line = np.arange(xmin, xmax + step, step)
+        if i % 2 == 1:
+            xs_line = xs_line[::-1]
+        for x in xs_line:
+            path.append((x, y))
+
+    # move to start
+    start = np.array([path[0][0], path[0][1], z])
+    joints = solve_ik(start, quat)
+    move_to_joints(joints)
+
+    for (x, y) in path:
+        pos = np.array([x, y, z])
+        joints = solve_ik(pos, quat)
+        move_to_joints(joints)
+    print("wiping done")
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: bounds 0.38591084370305384 0.6092008083389784 -0.19115476356252098 0.12577819304444582
+wiping done
+
+  Stderr: 
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 0
+  Num Finishes: 1
+  Num Code Blocks: 1
+----------------------------------------------------------------------------------------------------
+Code saved to logs/dev_baseline/spill_wipe/seed_0/trial_00_sandboxrc_0_reward_1.000_taskcompleted_1/code.py
+
+Summary Statistics:
+Model: deepseek-v4.1-flash-1017
+Visual Differencing Model: qwen3.8-flash
+Config Path: env_configs/harness_eval/spill_wipe.yaml
+Git Commit: e6c2512 (Dirty: True)
+Total number of trials: 1
+Code generation success rate / Average reward / Task completed: 
+1.000/1.000/1
+Average code blocks: 1.000
+Average regenerations: 0.000
+Average finishes: 1.000
+Elapsed time: 45.36 seconds

@@ -1,0 +1,319 @@
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python /home/oplin/PythonProjects/cap-task/cap-x/capx/third_party/robosuite/robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:32)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly, otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:42)
+R1Pro not installed, skipping R1Pro APIs
+LIBERO not installed!
+R1Pro not installed!
+API server on 127.0.0.1:8114 already running, skipping
+API server on 127.0.0.1:8116 already running, skipping
+[robosuite INFO] Loading controller configuration from: capx/integrations/robosuite/controllers/config/robots/panda_joint_ctrl.json (composite_controller_factory.py:121)
+init franka control api
+init grasp net plan fn
+init sam3 seg fn
+Running Trials:   0%|          | 0/1 [00:00<?, ?it/s]Time taken to query model: 6.38 seconds
+Time taken to query model: 16.29 seconds
+Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 15
+    ```
+    ^
+SyntaxError: invalid syntax
+Time taken to query model: 8.79 seconds
+Time taken to query model: 6.50 seconds
+Model chose to regenerate code
+Code block 1 done
+Number of code blocks: 2
+x: 0.3838346069309695 0.6093972524434894 y: 0.005731556245880527 0.2389884903946908
+wiping complete
+Time taken to query model: 10.04 seconds
+Time taken to query model: 1.22 seconds
+Model chose to finish
+Code blocks done
+Saved interaction video to logs/dev_baseline/spill_wipe/seed_1/trial_01_sandboxrc_0_reward_1.000_taskcompleted_1/video_turn_01.mp4 (19 frames)
+Saved interaction video to logs/dev_baseline/spill_wipe/seed_1/trial_01_sandboxrc_0_reward_1.000_taskcompleted_1/video_combined.mp4 (20 frames)
+Trial 1 took 53.92 seconds
+Running Trials: 100%|██████████| 1/1 [00:54<00:00, 54.10s/it]Running Trials: 100%|██████████| 1/1 [00:54<00:00, 54.10s/it]
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+# Segment the brown spill
+masks = segment_sam3_text_prompt(rgb, text_prompt="brown spill")
+print("num masks:", len(masks))
+for i, m in enumerate(masks):
+    print(i, "score", m.get("score"), "box", m.get("box"))
+```
+
+```python
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="brown spill")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+
+# Backproject masked pixels to 3D in camera frame, then to world
+ys, xs = np.where(mask)
+zs = depth[ys, xs]
+valid = zs > 0
+xs, ys, zs = xs[valid], ys[valid], zs[valid]
+
+fx, fy = K[0, 0], K[1, 1]
+cx, cy = K[0, 2], K[1, 2]
+Xc = (xs - cx) * zs / fx
+Yc = (ys - cy) * zs / fy
+Zc = zs
+pts_cam = np.stack([Xc, Yc, Zc], axis=1)
+
+# camera pose_mat maps camera -> world
+R = cam_pose[:3, :3]
+t = cam_pose[:3, 3]
+pts_world = (R @ pts_cam.T).T + t
+
+print("world x range:", pts_world[:,0].min(), pts_world[:,0].max())
+print("world y range:", pts_world[:,1].min(), pts_world[:,1].max())
+print("world z range:", pts_world[:,2].min(), pts_world[:,2].max())
+print("num points:", len(pts_world))
+```
+
+```python
+import numpy as np
+
+# Use the spill extents computed above (recompute to be safe)
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="brown spill")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+
+ys, xs = np.where(mask)
+zs = depth[ys, xs]
+valid = zs > 0
+xs, ys, zs = xs[valid], ys[valid], zs[valid]
+fx, fy = K[0, 0], K[1, 1]
+cx, cy = K[0, 2], K[1, 2]
+Xc = (xs - cx) * zs / fx
+Yc = (ys - cy) * zs / fy
+pts_cam = np.stack([Xc, Yc, zs], axis=1)
+R = cam_pose[:3, :3]
+t = cam_pose[:3, 3]
+pts_world = (R @ pts_cam.T).T + t
+
+xmin, xmax = pts_world[:,0].min(), pts_world[:,0].max()
+ymin, ymax = pts_world[:,1].min(), pts_world[:,1].max()
+print("x:", xmin, xmax, "y:", ymin, ymax)
+
+# Downward-facing orientation
+quat = np.array([0.0, 0.0, 1.0, 0.0])
+
+# Approach above the spill center first
+cxw = (xmin + xmax) / 2.0
+cyw = (ymin + ymax) / 2.0
+
+# Move to a safe hover above center
+hover = np.array([cxw, cyw, 0.15])
+joints = solve_ik(hover, quat)
+move_to_joints(joints)
+
+# Lower to table height (z=0)
+down = np.array([cxw, cyw, 0.0])
+joints = solve_ik(down, quat)
+move_to_joints(joints)
+```
+
+```python
+import numpy as np
+
+# Recompute extents (state may have changed slightly)
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="brown spill")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+
+ys, xs = np.where(mask)
+zs = depth[ys, xs]
+valid = zs > 0
+xs, ys, zs = xs[valid], ys[valid], zs[valid]
+fx, fy = K[0, 0], K[1, 1]
+cx, cy = K[0, 2], K[1, 2]
+Xc = (xs - cx) * zs / fx
+Yc = (ys - cy) * zs / fy
+pts_cam = np.stack([Xc, Yc, zs], axis=1)
+R = cam_pose[:3, :3]
+t = cam_pose[:3, 3]
+pts_world = (R @ pts_cam.T).T + t
+
+xmin, xmax = pts_world[:,0].min(), pts_world[:,0].max()
+ymin, ymax = pts_world[:,1].min(), pts_world[:,1].max()
+
+quat = np.array([0.0, 0.0, 1.0, 0.0])
+
+# Small margin inside extents to keep motions modest
+mx = 0.01
+my = 0.01
+x0, x1 = xmin + mx, xmax - mx
+y0, y1 = ymin + my, ymax - my
+if x1 <= x0:
+    x0, x1 = xmin, xmax
+if y1 <= y0:
+    y0, y1 = ymin, ymax
+
+# Serpentine wiping path at z=0 with small steps
+n_x = 4
+n_y = 4
+xs_path = np.linspace(x0, x1, n_x)
+ys_path = np.linspace(y0, y1, n_y)
+
+waypoints = []
+for j, yy in enumerate(ys_path):
+    xseq = xs_path if j % 2 == 0 else xs_path[::-1]
+    for xx in xseq:
+        waypoints.append(np.array([xx, yy, 0.0]))
+
+# Execute wiping waypoints
+for wp in waypoints:
+    joints = solve_ik(wp, quat)
+    move_to_joints(joints)
+
+# Lift up after wiping
+lift = np.array([(x0+x1)/2.0, (y0+y1)/2.0, 0.15])
+joints = solve_ik(lift, quat)
+move_to_joints(joints)
+print("wiping complete")
+
+# Code block 1
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="brown spill")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+
+ys, xs = np.where(mask)
+zs = depth[ys, xs]
+valid = zs > 0
+xs, ys, zs = xs[valid], ys[valid], zs[valid]
+fx, fy = K[0, 0], K[1, 1]
+cx, cy = K[0, 2], K[1, 2]
+Xc = (xs - cx) * zs / fx
+Yc = (ys - cy) * zs / fy
+pts_cam = np.stack([Xc, Yc, zs], axis=1)
+R = cam_pose[:3, :3]
+t = cam_pose[:3, 3]
+pts_world = (R @ pts_cam.T).T + t
+
+xmin, xmax = pts_world[:,0].min(), pts_world[:,0].max()
+ymin, ymax = pts_world[:,1].min(), pts_world[:,1].max()
+print("x:", xmin, xmax, "y:", ymin, ymax)
+
+quat = np.array([0.0, 0.0, 1.0, 0.0])
+
+cxw = (xmin + xmax) / 2.0
+cyw = (ymin + ymax) / 2.0
+
+hover = np.array([cxw, cyw, 0.15])
+joints = solve_ik(hover, quat)
+move_to_joints(joints)
+
+down = np.array([cxw, cyw, 0.0])
+joints = solve_ik(down, quat)
+move_to_joints(joints)
+
+mx = 0.01
+my = 0.01
+x0, x1 = xmin + mx, xmax - mx
+y0, y1 = ymin + my, ymax - my
+if x1 <= x0:
+    x0, x1 = xmin, xmax
+if y1 <= y0:
+    y0, y1 = ymin, ymax
+
+n_x = 4
+n_y = 4
+xs_path = np.linspace(x0, x1, n_x)
+ys_path = np.linspace(y0, y1, n_y)
+
+waypoints = []
+for j, yy in enumerate(ys_path):
+    xseq = xs_path if j % 2 == 0 else xs_path[::-1]
+    for xx in xseq:
+        waypoints.append(np.array([xx, yy, 0.0]))
+
+for wp in waypoints:
+    joints = solve_ik(wp, quat)
+    move_to_joints(joints)
+
+lift = np.array([(x0+x1)/2.0, (y0+y1)/2.0, 0.15])
+joints = solve_ik(lift, quat)
+move_to_joints(joints)
+print("wiping complete")
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: x: 0.3838346069309695 0.6093972524434894 y: 0.005731556245880527 0.2389884903946908
+wiping complete
+
+  Stderr: Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 15
+    ```
+    ^
+SyntaxError: invalid syntax
+
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 1
+  Num Finishes: 1
+  Num Code Blocks: 2
+----------------------------------------------------------------------------------------------------
+Code saved to logs/dev_baseline/spill_wipe/seed_1/trial_01_sandboxrc_0_reward_1.000_taskcompleted_1/code.py
+
+Summary Statistics:
+Model: deepseek-v4.1-flash-1017
+Visual Differencing Model: qwen3.8-flash
+Config Path: env_configs/harness_eval/spill_wipe.yaml
+Git Commit: e6c2512 (Dirty: True)
+Total number of trials: 1
+Code generation success rate / Average reward / Task completed: 
+1.000/1.000/1
+Average code blocks: 2.000
+Average regenerations: 1.000
+Average finishes: 1.000
+Elapsed time: 54.99 seconds

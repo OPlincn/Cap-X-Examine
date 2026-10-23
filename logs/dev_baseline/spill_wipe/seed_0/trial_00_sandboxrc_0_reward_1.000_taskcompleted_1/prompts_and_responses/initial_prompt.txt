@@ -1,0 +1,207 @@
+You are controlling a Franka Emika robot with API described below.
+Goal: wipe up the 'brown spill'. 
+A sponge is already attached to your gripper/end-effector.
+The table surface height is exactly z = 0.0 m, and wiping should be performed at that height (no extra offset).
+Use the spill extents to inform the min/max x and y bounds of wiping motions.
+Avoid large wiping motions since large deltas between inverse kinematics solutions may not guarantee optimal trajectories.
+A sponge is already attached to the end-effector, and you should use a downward-facing orientation (0,0,1,0 wxyz) for wiping.
+You may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.
+After this code executes, you will receive the current console stdout and stderr (any errors or print statements made in the code). You will then have the chance to write new code to query the environment state and/or complete the task.
+The functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.
+
+APIs:
+
+get_observation() -> dict[str, typing.Any]
+  Doc:
+    Get the observation of the environment.
+    Returns:
+        observation:
+            A dictionary containing the observation of the environment.
+            The dictionary contains the following keys:
+            - ["robot0_robotview"]["images"]["rgb"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.
+            - ["robot0_robotview"]["images"]["depth"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.
+            - ["robot0_robotview"]["intrinsics"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.
+            - ["robot0_robotview"]["pose_mat"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.
+
+segment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]
+  Doc:
+    Run SAM3 segmentation on an RGB image conditioned on a text prompt.
+    
+    Args:
+        rgb:
+            RGB image array of shape (H, W, 3), dtype uint8.
+        text_prompt:
+            Text prompt for SAM3 segmentation.
+    
+    Returns:
+        masks:
+            A list of dictionaries. Each dict may contain:
+    
+              - "mask":  np.ndarray of shape (H, W), dtype bool,
+                          where True means the pixel belongs to the instance.
+              - "box": list [x1, y1, x2, y2] in pixel coordinates.
+              - "score": float confidence score.
+    
+    Example:
+        >>> rgb = obs["robot0_robotview"]["images"]["rgb"]
+        >>> masks = segment_sam3(rgb, text_prompt="red mug")
+
+segment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]
+  Doc:
+    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.
+    
+    Args:
+        rgb:
+            RGB image array of shape (H, W, 3), dtype uint8.
+        point_coords:
+            (x, y) pixel coordinates of the point prompt.
+    
+    Returns:
+        masks:
+            A list of dictionaries. Each dict may contain:
+    
+              - "mask":  np.ndarray of shape (H, W), dtype bool,
+                          where True means the pixel belongs to the instance.
+              - "score": float confidence score.
+    
+    Example:
+        >>> rgb = obs["robot0_robotview"]["images"]["rgb"]
+        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))
+
+plan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]
+  Doc:
+    Plan grasp candidates using Contact-GraspNet for a single instance.
+    
+    This is a thin wrapper around the Contact-GraspNet planner. It does not
+    apply any camera/world transforms or TCP offsets: the caller is
+    responsible for transforming the resulting grasp poses into the desired
+    frame and applying TCP offsets if necessary.
+    
+    Args:
+        depth:
+            Depth image in meters.
+            Shape: (H, W), dtype float32/float64.
+        intrinsics:
+            Camera intrinsic matrix.
+            Shape: (3, 3), dtype float64.
+        segmentation:
+            Instance segmentation map where each integer > 0 corresponds to a
+            unique object instance ID.
+            Shape: (H, W) or (H, W, 1), dtype int32/int64.
+    
+    Returns:
+        grasp_poses:
+            np.ndarray of shape (K, 4, 4), dtype float64.
+            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.
+        grasp_scores:
+            np.ndarray of shape (K,), dtype float64.
+            Confidence score for each candidate grasp.
+    
+    Example:
+        >>> cam = obs["robot0_robotview"]
+        >>> rgb = cam["images"]["rgb"]
+        >>> depth = cam["images"]["depth"]
+        >>> sam3_results = sam3_seg_fn(rgb, text_prompt="red mug")
+        >>> best = max(sam3_results, key=lambda d: d["score"])
+        >>> mask = best["mask"]
+        >>> K = cam["intrinsics"]
+        >>> grasp_poses, grasp_scores = plan_grasp(
+        ...     depth=depth,
+        ...     intrinsics=K,
+        ...     segmentation=mask,
+        ... )
+        >>> best_idx = grasp_scores.argmax()
+        >>> best_T = grasp_poses[best_idx]  # (4, 4)
+        >>> camera_extrinsics = cam["pose_mat"]
+        >>> grasp_sample_world_frame = camera_extrinsics @ best_T
+
+get_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]
+  Doc:
+    Get the oriented bounding box from 3D points.
+    
+    Args:
+        points: np.ndarray: The 3D points to get the oriented bounding box from.
+            Shape: (N, 3), dtype float64.
+    
+    Returns:
+        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:
+            - "center": np.ndarray: The center of the oriented bounding box in point cloud frame.
+            - "extent": np.ndarray: The extent of the oriented bounding box.
+            - "R": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.
+    
+    Example:
+        >>> points = np.random.randn((100, 3))
+        >>> obb = get_oriented_bounding_box_from_3d_points(points)
+
+solve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray
+  Doc:
+    Solve inverse kinematics for the panda_hand link.
+    
+    Args:
+        position:
+            Target position in world frame.
+            Shape: (3,), dtype float64.
+        quaternion_wxyz:
+            Target orientation as a unit quaternion in world frame.
+            Shape: (4,), [w, x, y, z], dtype float64.
+    
+    Returns:
+        joints:
+            np.ndarray of shape (7,), dtype float64.
+            Joint angles for the 7 DoF Franka arm.
+    
+    Example:
+        >>> target_pos = np.array([0.5, 0.0, 0.3])
+        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz
+        >>> joints = solve_ik(target_pos, target_quat)
+        >>> move_to_joints(joints)
+
+move_to_joints(joints: numpy.ndarray) -> None
+  Doc:
+    Move the robot to a given joint configuration in a blocking manner.
+    
+    Args:
+        joints:
+            Target joint angles for the 7-DoF Franka arm.
+            Shape: (7,), dtype float64.
+    
+    Returns:
+        None
+    
+    Example:
+        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])
+        >>> move_to_joints(joints)
+
+open_gripper() -> None
+  Doc:
+    Open gripper fully.
+    
+    Args:
+        None
+
+close_gripper() -> None
+  Doc:
+    Close gripper fully.
+    
+    Args:
+        None
+
+The initial state of the environment is described as follows:
+The environment shows a Franka Emika robot arm positioned above a white table surface. The camera view is from the robot's perspective, looking down at the workspace.
+
+**Key Observations:**
+1.  **Target Object**: There is a brown spill on the table. It has an irregular, elongated shape resembling a squiggly line or a distorted "S" or question mark. It occupies a significant portion of the central-left area of the visible table surface.
+2.  **Robot State**: The robot gripper is visible at the top center of the frame. A sponge is already attached to the end-effector (as per instructions). The gripper appears closed around the sponge.
+3.  **Workspace**: The table surface is flat and white. The background shows a wooden floor and some structural elements of the simulation environment.
+4.  **Task Context**: The goal is to wipe up the 'brown spill'. The wiping should be performed at height z = 0.0 m. The orientation for wiping must be downward-facing (quaternion [0, 0, 1, 0] in wxyz format, which corresponds to identity rotation if the base frame aligns with world Z-up, but typically implies pointing the tool down relative to the world frame depending on convention; here specified as `0,0,1,0` wxyz which is usually identity `[w,x,y,z]` -> `[1,0,0,0]`? Wait, standard ROS/robotics often uses `[x,y,z,w]`. The prompt says `wxyz`. So `[0,0,1,0]` means w=0, x=0, y=1, z=0? No, that's a 180 deg rotation around Y. Let's re-read carefully: `(0,0,1,0 wxyz)`. This likely means w=0, x=0, y=1, z=0. Or perhaps it's a typo for identity `[1,0,0,0]`? Actually, a common "downward facing" quaternion in many simulators where Z is up is `[0, 0, 1, 0]` if using `[x, y, z, w]` order? No, prompt explicitly says `wxyz`. If `wxyz` is `[0, 0, 1, 0]`, then w=0, x=0, y=1, z=0. This represents a 180-degree rotation about the Y-axis. If the default pose is pointing forward (+X), rotating 180 about Y points backward (-X)? That doesn't seem right for "downward".
+    *   Let's look at standard conventions. Often "downward" means the tool Z axis aligns with World -Z.
+    *   Identity quaternion `[1, 0, 0, 0]` (wxyz) usually means Tool Z aligns with World Z (Up).
+    *   To point Down (Tool Z aligns with World -Z), we need a 180 degree rotation around X or Y.
+    *   Rotation 180 around X: `[0, 1, 0, 0]` (wxyz).
+    *   Rotation 180 around Y: `[0, 0, 1, 0]` (wxyz).
+    *   The prompt specifies `(0,0,1,0 wxyz)`. This corresponds to a 180-degree rotation around the Y-axis. Assuming the robot's "forward" direction allows this to point the end effector downwards towards the table, this is the required orientation.
+
+**Initial State Summary:**
+*   **Object**: Brown spill located centrally on the table.
+*   **Robot**: Arm ready, sponge attached.
+*   **Action Required**: Segment the spill to determine its bounds, calculate wiping trajectories within those bounds at z=0.0, and execute them using the specified downward orientation.

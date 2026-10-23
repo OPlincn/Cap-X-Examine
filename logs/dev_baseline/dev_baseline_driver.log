@@ -1,0 +1,18 @@
+[run] task=cube_lifting seed=0 mode=baseline -> logs/dev_baseline/cube_lifting/seed_0
+[done] task=cube_lifting seed=0 exit=0
+[run] task=cube_lifting seed=1 mode=baseline -> logs/dev_baseline/cube_lifting/seed_1
+[done] task=cube_lifting seed=1 exit=0
+[run] task=cube_lifting seed=2 mode=baseline -> logs/dev_baseline/cube_lifting/seed_2
+[done] task=cube_lifting seed=2 exit=0
+[run] task=cube_stack seed=0 mode=baseline -> logs/dev_baseline/cube_stack/seed_0
+[done] task=cube_stack seed=0 exit=0
+[run] task=cube_stack seed=1 mode=baseline -> logs/dev_baseline/cube_stack/seed_1
+[done] task=cube_stack seed=1 exit=0
+[run] task=cube_stack seed=2 mode=baseline -> logs/dev_baseline/cube_stack/seed_2
+[done] task=cube_stack seed=2 exit=0
+[run] task=spill_wipe seed=0 mode=baseline -> logs/dev_baseline/spill_wipe/seed_0
+[done] task=spill_wipe seed=0 exit=0
+[run] task=spill_wipe seed=1 mode=baseline -> logs/dev_baseline/spill_wipe/seed_1
+[done] task=spill_wipe seed=1 exit=0
+[run] task=spill_wipe seed=2 mode=baseline -> logs/dev_baseline/spill_wipe/seed_2
+[done] task=spill_wipe seed=2 exit=0
