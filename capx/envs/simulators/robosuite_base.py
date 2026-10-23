@@ -94,6 +94,33 @@ class RobosuiteBaseEnv(BaseEnv):
             ]
         )
 
+    def _seed_robosuite_rng(self, seed: int | None) -> None:
+        """Make ``robosuite_env.reset()`` reproducible for a given episode seed.
+
+        Robosuite draws object placements, arena layouts and initial-joint noise
+        from ``robosuite_env.rng``, which is otherwise seeded once at construction.
+        """
+        if seed is None:
+            return
+        self._rng = np.random.default_rng(seed)
+        np.random.seed(seed)
+        self.robosuite_env.rng = np.random.default_rng(seed)
+        sampler = getattr(self.robosuite_env, "placement_initializer", None)
+        if sampler is not None:
+            sampler.rng = self.robosuite_env.rng
+            for sub_sampler in getattr(sampler, "samplers", {}).values():
+                sub_sampler.rng = self.robosuite_env.rng
+
+    def get_initial_state_record(self) -> dict[str, Any]:
+        """Evaluation-only identifier of the simulator state (never shown to the agent)."""
+        import hashlib
+
+        qpos = np.asarray(self.robosuite_env.sim.data.qpos, dtype=np.float64)
+        return {
+            "qpos_sha256_16": hashlib.sha256(np.round(qpos, 6).tobytes()).hexdigest()[:16],
+            "qpos": [round(float(x), 6) for x in qpos],
+        }
+
     def _init_viser_debug(self, viser_debug: bool) -> None:
         """Initialize viser debug state. Call at end of subclass __init__."""
         if viser_debug:
@@ -287,6 +314,15 @@ class RobosuiteBaseEnv(BaseEnv):
                 robosuite_obs[camera_name]["images"]["segmentation"] = robosuite_obs[
                     camera_name + "_segmentation_" + self.segmentation_level
                 ][::-1]
+
+    def _refresh_gripper_link_pose(self) -> None:
+        """Re-read the gripper link pose from sim (move_to_joints_blocking does not update it)."""
+        self.gripper_link_wxyz_xyz = np.concatenate(
+            [
+                self.robosuite_env.sim.data.xquat[self.gripper_link_idx],
+                self.robosuite_env.sim.data.xpos[self.gripper_link_idx],
+            ]
+        )
 
     def _compute_gripper_obs(self, robosuite_obs: dict[str, Any]) -> None:
         """Compute gripper pose and add robot_joint_pos / robot_cartesian_pos to obs."""

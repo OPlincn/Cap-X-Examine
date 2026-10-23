@@ -42,6 +42,10 @@ VLM_MODELS = [
     "deepseek/deepseek-r1",
     "qwen/qwen3.5-122b-a10b",
     "moonshotai/kimi-k2",
+    # Campus LLM gateway (OpenAI-compatible) multimodal models
+    "qwen3.8-flash",
+    "qwen3.7-plus",
+    "kimi-k2.6",
 ]
 CLAUDE_MODELS = ["anthropic/claude-opus-4-5", "anthropic/claude-haiku-4-5"]
 OSS_MODELS = [
@@ -64,6 +68,14 @@ OPENROUTER_MODELS = [
     "openrouter/qwen/qwen3-235b-a22b",
 ]
 OPENROUTER_SERVER_URL = "http://localhost:8110/chat/completions"
+
+# Fixed per-model request fields merged into every payload. Reasoning is disabled
+# so that token cost per call is predictable under a per-episode token budget.
+MODEL_PAYLOAD_EXTRAS: dict[str, dict[str, Any]] = {
+    "deepseek-v4.1-flash-1017": {"thinking": {"type": "disabled"}},
+    "qwen3.8-flash": {"enable_thinking": False},
+    "qwen3.7-plus": {"enable_thinking": False},
+}
 
 # ---------------------------------------------------------------------------
 # Ensemble configuration
@@ -236,6 +248,7 @@ def query_model(args: "LaunchArgs | ModelQueryArgs", prompt: list[dict]) -> str:
             "max_tokens": args.max_tokens,
             "messages": prompt,
         }
+    payload.update(MODEL_PAYLOAD_EXTRAS.get(args.model, {}))
     headers = {"Content-Type": "application/json"}
     if args.api_key:
         headers["Authorization"] = f"Bearer {args.api_key}"
@@ -248,7 +261,7 @@ def query_model(args: "LaunchArgs | ModelQueryArgs", prompt: list[dict]) -> str:
         server_url, headers=headers, data=json.dumps(payload), timeout=200
     )
     retry = 1
-    while response.status_code in [404, 500, 502, 503, 504]:
+    while response.status_code in [404, 429, 500, 502, 503, 504]:
         sleep_time = 240 + random.uniform(-90, 90)
         print(f"Retry {retry}. Model query failed with status code {response.status_code}. Error: {response.text}. Retrying in {sleep_time} seconds...")
         time.sleep(sleep_time)
@@ -273,8 +286,14 @@ def query_model(args: "LaunchArgs | ModelQueryArgs", prompt: list[dict]) -> str:
         raise RuntimeError(f"Unexpected response format: {body}") from exc
     if body.get("choices") is not None:
         out["reasoning"] = body.get("choices")[0].get("message").get("reasoning", None)
+        out["finish_reason"] = body.get("choices")[0].get("finish_reason")
     else:
         out["reasoning"] = None
+        out["finish_reason"] = None
+    out["usage"] = body.get("usage")
+    out["model_returned"] = body.get("model")
+    out["latency_s"] = end_time - start_time
+    out["http_attempts"] = retry
     return out  # type: ignore[return-value]
 
 

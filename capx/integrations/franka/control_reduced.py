@@ -13,6 +13,7 @@ from capx.envs.base import (
 )
 from capx.integrations.motion import pyroki_snippets as pks  # type: ignore
 from capx.integrations.base_api import ApiBase
+from capx.envs.tasks.base import sanitize_agent_observation
 from capx.integrations.franka.common import (
     apply_tcp_offset,
     close_gripper as _close_gripper,
@@ -59,10 +60,12 @@ class FrankaControlApiReduced(ApiBase):
         bimanual: bool = False,
         real: bool = False,
         use_sam3: bool = True,
+        use_molmo: bool = True,
     ) -> None:
         super().__init__(env)
         self._TCP_OFFSET = np.array(tcp_offset, dtype=np.float64)
         self.use_sam3 = use_sam3
+        self.use_molmo = use_molmo
         print("init franka control api")
         self.grasp_net_plan_fn = (
             init_contact_graspnet()
@@ -77,8 +80,9 @@ class FrankaControlApiReduced(ApiBase):
             print("init owlvit det fn")
             self.sam2_seg_fn = init_sam2()
             print("init sam2 seg fn")
-        self.molmo_point_fn = init_molmo()
-        print("init molmo point fn")
+        if self.use_molmo:
+            self.molmo_point_fn = init_molmo()
+            print("init molmo point fn")
 
         self.ik_solve_fn = init_pyroki()
         self.trajopt_plan_fn = init_pyroki_trajopt()
@@ -91,8 +95,9 @@ class FrankaControlApiReduced(ApiBase):
     def functions(self) -> dict[str, Any]:
         fns = {
             "get_observation": self.get_observation,
-            "point_prompt_molmo": self.point_prompt_molmo,
         }
+        if self.use_molmo:
+            fns["point_prompt_molmo"] = self.point_prompt_molmo
         if self.use_sam3:
             fns["segment_sam3_text_prompt"] = self.segment_sam3_text_prompt
             fns["segment_sam3_point_prompt"] = self.segment_sam3_point_prompt
@@ -140,7 +145,7 @@ class FrankaControlApiReduced(ApiBase):
                 - ["robot0_robotview"]["pose_mat"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.
         """
         self._log_step("get_observation", "Capturing camera observation …")
-        obs = self._env.get_observation()
+        obs = sanitize_agent_observation(self._env.get_observation())
         obs["robot0_robotview"]["images"]["depth"] = obs["robot0_robotview"]["images"]["depth"].squeeze(-1)
         self._log_step_update(images=obs["robot0_robotview"]["images"]["rgb"])
         return obs

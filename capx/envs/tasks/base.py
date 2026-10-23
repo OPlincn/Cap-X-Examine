@@ -33,6 +33,21 @@ class Tee(io.TextIOBase):
             st.flush()
 
 
+def sanitize_agent_observation(obs: dict[str, Any]) -> dict[str, Any]:
+    """Strip simulator ground truth from an observation before agent code can see it.
+
+    Keeps camera data (``robot0_robotview``: RGB-D, intrinsics, extrinsics), robot
+    proprioception (``robot0_*`` / ``robot_*``) and the prompt. Drops object poses,
+    object-to-gripper vectors, ``object-state`` and task-progress signals such as
+    ``proportion_wiped`` or ``wipe_centroid`` that Robosuite adds to its observations.
+    """
+    return {
+        k: v
+        for k, v in obs.items()
+        if k == "full_prompt" or k.startswith("robot0_") or k.startswith("robot_")
+    }
+
+
 @dataclass
 class CodeExecEnvConfig:
     """Configuration for a code-execution environment.
@@ -153,9 +168,13 @@ class CodeExecutionEnvBase(Env):
     def _exec_user_code(self, code: str) -> dict[str, Any]:
         obs = self._get_observation()
         # Update dynamic obs while retaining previously defined variables
-        self._exec_globals["obs"] = obs
-        self._exec_globals["env"] = self.low_level_env
-        self._exec_globals["APIS"] = self._apis
+        if self.cfg.privileged:
+            self._exec_globals["obs"] = obs
+            self._exec_globals["env"] = self.low_level_env
+            self._exec_globals["APIS"] = self._apis
+        else:
+            # Non-privileged agents only see sensor data, never the simulator handle.
+            self._exec_globals["obs"] = sanitize_agent_observation(obs)
         # Ensure API helper functions remain bound/current
         for api in self._apis.values():
             for fn_name, fn in api.functions().items():
@@ -191,13 +210,14 @@ class CodeExecutionEnvBase(Env):
         """
         g: dict[str, Any] = {
             "__name__": "__main__",
-            "env": self.low_level_env,
-            "APIS": self._apis,
             # Populated per-step/reset; keep reference stable across execs
             "INPUTS": {},
             # Users can set and reuse RESULT across steps if desired
             "RESULT": None,
         }
+        if self.cfg.privileged:
+            g["env"] = self.low_level_env
+            g["APIS"] = self._apis
         # Bind helper functions from APIs into the global namespace for convenience
         for api in self._apis.values():
             for fn_name, fn in api.functions().items():
@@ -256,7 +276,7 @@ class CodeExecutionEnvBase(Env):
         obs.update(self._get_observation())
         # Reinitialize globals for a fresh episode and prime INPUTS with the reset observation
         self._init_exec_globals()
-        self._exec_globals["INPUTS"] = obs
+        self._exec_globals["INPUTS"] = obs if self.cfg.privileged else sanitize_agent_observation(obs)
         info.update({"task_prompt": self._task_prompt})
         return obs, info
 
@@ -402,6 +422,7 @@ __all__ = [
     "get_config",
     "list_configs",
     "SimpleExecutor",
+    "sanitize_agent_observation",
     "CodeExecEnvConfig",
     "CodeExecutionEnvBase",
 ]

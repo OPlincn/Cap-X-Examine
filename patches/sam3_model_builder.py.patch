@@ -1,0 +1,20 @@
+--- a/capx/third_party/sam3/sam3/model_builder.py	2026-10-23 14:37:56.885757605 +0800
++++ b/capx/third_party/sam3/sam3/model_builder.py	2026-10-20 17:02:01.626374610 +0800
+@@ -642,6 +642,17 @@
+ 
+ 
+ def download_ckpt_from_hf():
++    local_ckpt = os.environ.get(
++        "SAM3_CHECKPOINT_PATH",
++        os.path.abspath(
++            os.path.join(
++                os.path.dirname(__file__),
++                "../../../../checkpoints/sam3/sam3.pt",
++            )
++        ),
++    )
++    if os.path.exists(local_ckpt):
++        return local_ckpt
+     SAM3_MODEL_ID = "facebook/sam3"
+     SAM3_CKPT_NAME = "sam3.pt"
+     SAM3_CFG_NAME = "config.json"

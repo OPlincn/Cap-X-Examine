@@ -103,8 +103,7 @@ class FrankaRobosuiteCubeLiftLowLevel(RobosuiteBaseEnv):
     def reset(
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        if seed is not None:
-            self._rng = np.random.default_rng(seed)
+        self._seed_robosuite_rng(seed)
 
         self.robosuite_env.reset()
         # Adjust initial orientation
@@ -172,7 +171,8 @@ class FrankaRobosuiteCubeLiftLowLevel(RobosuiteBaseEnv):
 
     def get_observation(self) -> dict[str, Any]:
         """Get observation in FrankaPickPlaceLowLevel format."""
-        robosuite_obs = self.robosuite_env._get_observations()
+        self._refresh_gripper_link_pose()
+        robosuite_obs = self.robosuite_env._get_observations(force_update=True)
         pose_dict = self._cube_pose_dict(robosuite_obs)
         cube_pose_array = np.stack(
             [

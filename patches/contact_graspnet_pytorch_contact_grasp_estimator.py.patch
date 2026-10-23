@@ -1,0 +1,29 @@
+--- a/capx/third_party/contact_graspnet_pytorch/contact_graspnet_pytorch/contact_grasp_estimator.py	2026-10-23 14:37:52.488703412 +0800
++++ b/capx/third_party/contact_graspnet_pytorch/contact_graspnet_pytorch/contact_grasp_estimator.py	2026-10-20 17:10:08.504265501 +0800
+@@ -196,18 +196,14 @@
+ 
+         # Run model inference
+         # pred_grasps_cam, pred_scores, pred_points, offset_pred = sess.run(self.inference_ops, feed_dict=feed_dict)
+-        pred = self.model(pc_batch)
+-        pred_grasps_cam = pred['pred_grasps_cam']
+-        pred_scores = pred['pred_scores']
+-        pred_points = pred['pred_points']
+-        offset_pred = pred['offset_pred']
+-
+-
+-
+-        pred_grasps_cam = pred_grasps_cam.detach().cpu().numpy()
+-        pred_scores = pred_scores.detach().cpu().numpy()
+-        pred_points = pred_points.detach().cpu().numpy()
+-        offset_pred = offset_pred.detach().cpu().numpy()
++        with torch.no_grad():
++            pred = self.model(pc_batch)
++            pred_grasps_cam = pred['pred_grasps_cam'].detach().cpu().numpy()
++            pred_scores = pred['pred_scores'].detach().cpu().numpy()
++            pred_points = pred['pred_points'].detach().cpu().numpy()
++            offset_pred = pred['offset_pred'].detach().cpu().numpy()
++        del pc_batch, pred
++        torch.cuda.empty_cache()
+ 
+         pred_grasps_cam = pred_grasps_cam.reshape(-1, *pred_grasps_cam.shape[-2:])
+         pred_points = pred_points.reshape(-1, pred_points.shape[-1])

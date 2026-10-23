@@ -44,6 +44,12 @@ register_api(
     lambda env: FrankaControlApiReduced(env, tcp_offset=[0.0, 0.0, -0.0158]),
 )
 register_api("FrankaControlApiReducedExampleless", FrankaControlApiReducedExampleless)
+# Molmo-free variants of the S3 API, for hosts that cannot serve Molmo next to SAM3/GraspNet.
+register_api("FrankaControlApiReducedNoMolmo", lambda env: FrankaControlApiReduced(env, use_molmo=False))
+register_api(
+    "FrankaControlApiReducedSpillWipeNoMolmo",
+    lambda env: FrankaControlApiReduced(env, tcp_offset=[0.0, 0.0, -0.0158], use_molmo=False),
+)
 
 register_api("FrankaControlApiReducedSkillLibrary", FrankaControlApiReducedSkillLibrary)
 register_api(
