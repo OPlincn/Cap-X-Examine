@@ -1,0 +1,9 @@
+[run] task=cube_restack seed=0 mode=ours -> logs/dev_phase2/cube_restack/ours/seed_0
+[done] task=cube_restack seed=0 mode=ours exit=0
+[run] task=cube_restack seed=0 mode=ablation -> logs/dev_phase2/cube_restack/ablation/seed_0
+[done] task=cube_restack seed=0 mode=ablation exit=0
+[run] task=cube_restack seed=1 mode=ablation -> logs/dev_phase2/cube_restack/ablation/seed_1
+[done] task=cube_restack seed=1 mode=ablation exit=0
+[run] task=cube_restack seed=1 mode=ours -> logs/dev_phase2/cube_restack/ours/seed_1
+[done] task=cube_restack seed=1 mode=ours exit=0
+[run] task=cube_restack seed=2 mode=ours -> logs/dev_phase2/cube_restack/ours/seed_2

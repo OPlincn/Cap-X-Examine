@@ -81,11 +81,11 @@ use_multimodel: false
 use_video_differencing: false
 
 budget:
-  max_turns: 10            # code executions per episode
-  max_model_calls: 24      # coding + VDM calls per episode
-  max_total_tokens: 200000 # coding + VDM input+output tokens per episode
+  max_turns: 8             # code executions per episode (Phase 2, binding)
+  max_model_calls: 16      # coding + VDM calls per episode (Phase 2, binding)
+  max_total_tokens: 60000  # coding + VDM input+output tokens per episode (Phase 2, binding)
   max_sim_steps: 4000      # = robosuite horizon of this task
-  max_wall_time_s: 1200
+  max_wall_time_s: 600
   max_completion_tokens: 8192
 
 record_video: true

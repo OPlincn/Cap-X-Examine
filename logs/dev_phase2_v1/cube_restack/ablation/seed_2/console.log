@@ -1,0 +1,39 @@
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python /home/oplin/PythonProjects/cap-task/cap-x/capx/third_party/robosuite/robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:32)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly, otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:42)
+R1Pro not installed, skipping R1Pro APIs
+LIBERO not installed!
+R1Pro not installed!
+API server on 127.0.0.1:8114 already running, skipping
+API server on 127.0.0.1:8115 already running, skipping
+API server on 127.0.0.1:8116 already running, skipping
+[robosuite INFO] Loading controller configuration from: capx/integrations/robosuite/controllers/config/robots/panda_joint_ctrl.json (composite_controller_factory.py:121)
+init franka control api
+init grasp net plan fn
+init sam3 seg fn
+Running Trials:   0%|          | 0/1 [00:00<?, ?it/s]Time taken to query model: 7.94 seconds
+Time taken to query model: 15.24 seconds
+Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 48
+    ```
+    ^
+SyntaxError: invalid syntax
+Time taken to query model: 6.06 seconds
+Time taken to query model: 13.36 seconds
+Model chose to regenerate code
+Code block 1 done
+Number of code blocks: 2
+Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 97
+    ```
+    ^
+SyntaxError: invalid syntax
+Time taken to query model: 7.64 seconds
+/home/oplin/miniconda3/envs/PaddleYOLO/lib/python3.10/multiprocessing/resource_tracker.py:224: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

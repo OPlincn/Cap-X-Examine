@@ -1,0 +1,102 @@
+# Code block 0
+I'll start by getting the observation to understand the scene.
+
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+pose_mat = cam["pose_mat"]
+print("rgb", rgb.shape, "depth", depth.shape)
+print("K", K)
+print("pose_mat", pose_mat)
+print("depth range", np.nanmin(depth), np.nanmax(depth))
+
+# Code block 1
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+pose_mat = cam["pose_mat"]
+print("rgb", rgb.shape, "depth", depth.shape)
+print("K", K)
+print("pose_mat", pose_mat)
+print("depth range", np.nanmin(depth), np.nanmax(depth))
+
+# Code block 2
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+pose_mat = cam["pose_mat"]
+
+# Segment red cube
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+print("num masks", len(masks))
+for m in masks:
+    print("score", m.get("score"), "box", m.get("box"))
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+print("mask sum", mask.sum())
+
+# Plan grasp
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+print("num grasps", len(grasp_poses))
+if len(grasp_poses) > 0:
+    best_idx = int(np.argmax(grasp_scores))
+    best_T = grasp_poses[best_idx]
+    print("best score", grasp_scores[best_idx])
+    print("best_T cam", best_T)
+    T_world = pose_mat @ best_T
+    print("T_world", T_world)
+    pos = T_world[:3, 3]
+    # quaternion from rotation matrix
+    R = T_world[:3, :3]
+    # convert to wxyz
+    tr = np.trace(R)
+    if tr > 0:
+        S = np.sqrt(tr + 1.0) * 2
+        w = 0.25 * S
+        x = (R[2,1] - R[1,2]) / S
+        y = (R[0,2] - R[2,0]) / S
+        z = (R[1,0] - R[0,1]) / S
+    elif (R[0,0] > R[1,1]) and (R[0,0] > R[2,2]):
+        S = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+        w = (R[2,1] - R[1,2]) / S
+        x = 0.25 * S
+        y = (R[0,1] + R[1,0]) / S
+        z = (R[0,2] + R[2,0]) / S
+    elif R[1,1] > R[2,2]:
+        S = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+        w = (R[0,2] - R[2,0]) / S
+        x = (R[0,1] + R[1,0]) / S
+        y = 0.25 * S
+        z = (R[1,2] + R[2,1]) / S
+    else:
+        S = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+        w = (R[1,0] - R[0,1]) / S
+        x = (R[0,2] + R[2,0]) / S
+        y = (R[1,2] + R[2,1]) / S
+        z = 0.25 * S
+    quat = np.array([w, x, y, z])
+    quat = quat / np.linalg.norm(quat)
+    print("pos", pos, "quat", quat)
+    # approach from above: pre-grasp
+    pre_pos = pos.copy()
+    pre_pos[2] += 0.1
+    open_gripper()
+    joints = solve_ik(pre_pos, quat)
+    move_to_joints(joints)
+    joints = solve_ik(pos, quat)
+    move_to_joints(joints)
+    close_gripper()
+    lift_pos = pos.copy()
+    lift_pos[2] += 0.15
+    joints = solve_ik(lift_pos, quat)
+    move_to_joints(joints)
+    print("done")

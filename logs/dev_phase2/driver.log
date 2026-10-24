@@ -1,0 +1,34 @@
+[run] task=cube_restack seed=0 mode=ours -> logs/dev_phase2/cube_restack/ours/seed_0
+[done] task=cube_restack seed=0 mode=ours exit=0
+[run] task=cube_restack seed=0 mode=ablation -> logs/dev_phase2/cube_restack/ablation/seed_0
+[done] task=cube_restack seed=0 mode=ablation exit=0
+[run] task=cube_restack seed=1 mode=ablation -> logs/dev_phase2/cube_restack/ablation/seed_1
+[done] task=cube_restack seed=1 mode=ablation exit=0
+[run] task=cube_restack seed=1 mode=ours -> logs/dev_phase2/cube_restack/ours/seed_1
+[done] task=cube_restack seed=1 mode=ours exit=0
+[run] task=cube_restack seed=2 mode=ours -> logs/dev_phase2/cube_restack/ours/seed_2
+[done] task=cube_restack seed=2 mode=ours exit=0
+[run] task=cube_restack seed=2 mode=ablation -> logs/dev_phase2/cube_restack/ablation/seed_2
+[done] task=cube_restack seed=2 mode=ablation exit=0
+[run] task=cube_lifting seed=0 mode=ours -> logs/dev_phase2/cube_lifting/ours/seed_0
+[done] task=cube_lifting seed=0 mode=ours exit=0
+[run] task=cube_lifting seed=0 mode=ablation -> logs/dev_phase2/cube_lifting/ablation/seed_0
+[done] task=cube_lifting seed=0 mode=ablation exit=0
+[run] task=cube_lifting seed=1 mode=ablation -> logs/dev_phase2/cube_lifting/ablation/seed_1
+[skip] logs/dev_phase2/cube_restack/ours/seed_0 already has an episode log (no reruns)
+[skip] logs/dev_phase2/cube_restack/ablation/seed_0 already has an episode log (no reruns)
+[skip] logs/dev_phase2/cube_restack/ablation/seed_1 already has an episode log (no reruns)
+[skip] logs/dev_phase2/cube_restack/ours/seed_1 already has an episode log (no reruns)
+[skip] logs/dev_phase2/cube_restack/ours/seed_2 already has an episode log (no reruns)
+[skip] logs/dev_phase2/cube_restack/ablation/seed_2 already has an episode log (no reruns)
+[skip] logs/dev_phase2/cube_lifting/ours/seed_0 already has an episode log (no reruns)
+[run] task=cube_lifting seed=0 mode=ablation -> logs/dev_phase2/cube_lifting/ablation/seed_0
+[done] task=cube_lifting seed=0 mode=ablation exit=0
+[run] task=cube_lifting seed=1 mode=ablation -> logs/dev_phase2/cube_lifting/ablation/seed_1
+[done] task=cube_lifting seed=1 mode=ablation exit=0
+[run] task=cube_lifting seed=1 mode=ours -> logs/dev_phase2/cube_lifting/ours/seed_1
+[done] task=cube_lifting seed=1 mode=ours exit=0
+[run] task=cube_lifting seed=2 mode=ours -> logs/dev_phase2/cube_lifting/ours/seed_2
+[done] task=cube_lifting seed=2 mode=ours exit=0
+[run] task=cube_lifting seed=2 mode=ablation -> logs/dev_phase2/cube_lifting/ablation/seed_2
+[done] task=cube_lifting seed=2 mode=ablation exit=0

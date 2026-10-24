@@ -27,6 +27,7 @@ from PIL import Image
 from capx.envs.configs.instantiate import instantiate
 from capx.envs.tasks.base import CodeExecutionEnvBase
 from capx.envs.telemetry import BudgetExceeded, EpisodeBudget, EpisodeTelemetry, get_active_telemetry
+from capx.envs import eg_vdm
 
 from capx.llm.client import (
     VLM_MODELS,
@@ -447,6 +448,63 @@ def _get_visual_differencing_feedback(
     return content
 
 
+def _get_step3_feedback(
+    mode: str,
+    visual_differencing_args: ModelQueryArgs,
+    task_description: str,
+    visual_feedback_base64_history: list[str],
+    exec_record: dict[str, Any],
+    step3_state: eg_vdm.Step3State,
+) -> str:
+    """Step 3 for ``ours`` / ``ablation``: build the feedback-slot text (see capx.envs.eg_vdm)."""
+    tele = get_active_telemetry()
+    turn_idx = tele.num_code_executions - 1 if tele is not None else None
+    n = len(visual_feedback_base64_history)
+    image_names = [f"visual_feedback_{n - 2:02d}.png", f"visual_feedback_{n - 1:02d}.png"]
+
+    if mode == "ours":
+        header = eg_vdm.format_exec_header(exec_record)
+        if exec_record["num_motion_calls"] == 0:
+            assessment, label = eg_vdm.gate_message(exec_record, step3_state)
+            if tele is not None:
+                tele.last_vdm = {
+                    "purpose": "zero_motion_gate",
+                    "vdm_prompt": None,
+                    "vdm_output": assessment,
+                    "vdm_call_index": None,
+                    "vdm_skipped_by_gate": True,
+                    "vdm_verdict": label,
+                    "vdm_verdict_source": "gate",
+                }
+            return eg_vdm.compose_slot(mode, header, assessment)
+        prompt = eg_vdm.structured_vdm_prompt(
+            task_description, visual_feedback_base64_history[-2], visual_feedback_base64_history[-1],
+            exec_record=exec_record, generic_checklist=False,
+        )
+    elif mode == "ablation":
+        header = eg_vdm.GENERIC_SLOT_HEADER
+        prompt = eg_vdm.structured_vdm_prompt(
+            task_description, visual_feedback_base64_history[-2], visual_feedback_base64_history[-1],
+            exec_record=None, generic_checklist=True,
+        )
+    else:
+        raise ValueError(f"Step-3 feedback is not defined for mode {mode!r}")
+
+    assessment = _budgeted_query(
+        visual_differencing_args, prompt, role="vdm", purpose=f"vdm_diff_{mode}", turn_idx=turn_idx
+    )["content"]
+    _set_last_vdm(f"vdm_diff_{mode}", prompt, image_names, assessment)
+    if mode == "ours":
+        label = step3_state.update_after_vdm(turn_idx, assessment)
+    else:
+        label = eg_vdm.parse_verdict(assessment) or "UNCERTAIN"
+    if tele is not None and tele.last_vdm is not None:
+        tele.last_vdm.update(
+            {"vdm_skipped_by_gate": False, "vdm_verdict": label, "vdm_verdict_source": "structured"}
+        )
+    return eg_vdm.compose_slot(mode, header, assessment)
+
+
 # ---------------------------------------------------------------------------
 # Video differencing
 # ---------------------------------------------------------------------------
@@ -580,6 +638,9 @@ def _handle_multi_turn_step(
     turn_frames: list[np.ndarray] | None = None,
     wrist_turn_frames: list[np.ndarray] | None = None,
     wrist_base64_history: list[str] | None = None,
+    mode: str = "baseline",
+    exec_record: dict[str, Any] | None = None,
+    step3_state: eg_vdm.Step3State | None = None,
 ) -> tuple[str, str | None, str | None, dict | None, list | None]:
     """Execute one multi-turn decision step.
 
@@ -636,11 +697,27 @@ def _handle_multi_turn_step(
         )
         is_video_feedback = True
     elif config["use_img_differencing"] and len(visual_feedback_base64_history) >= 2:
-        # Image-based differencing: pass before/after images to VDM
-        differencing_feedback = _get_visual_differencing_feedback(
-            visual_differencing_args, task_description, visual_feedback_base64_history,
-            wrist_base64_history=wrist_base64_history,
-        )
+        if mode == "baseline":
+            # Image-based differencing: pass before/after images to VDM
+            differencing_feedback = _get_visual_differencing_feedback(
+                visual_differencing_args, task_description, visual_feedback_base64_history,
+                wrist_base64_history=wrist_base64_history,
+            )
+            tele = get_active_telemetry()
+            if tele is not None and tele.last_vdm is not None:
+                tele.last_vdm.update({
+                    "vdm_skipped_by_gate": False,
+                    "vdm_verdict": eg_vdm.heuristic_verdict(differencing_feedback),
+                    "vdm_verdict_source": "heuristic",
+                })
+        else:
+            differencing_feedback = _get_step3_feedback(
+                mode, visual_differencing_args, task_description, visual_feedback_base64_history,
+                exec_record, step3_state,
+            )
+        tele = get_active_telemetry()
+        if tele is not None and tele.last_vdm is not None:
+            tele.last_vdm["step3_feedback"] = differencing_feedback
 
     # Only pass visual feedback to prompt if visual_feedback is enabled
     if not config["use_visual_feedback"]:
@@ -718,8 +795,6 @@ def _run_single_trial(
     mode = config.get("harness_mode", "baseline")
     if mode not in HARNESS_MODES:
         raise ValueError(f"Unknown harness mode {mode!r}")
-    if mode != "baseline":
-        raise NotImplementedError(f"Harness mode {mode!r} is not implemented yet (Phase 2)")
     task_name = config.get("task_name", "unknown_task")
     tele = EpisodeTelemetry(
         task_name=task_name,
@@ -752,7 +827,9 @@ def _run_single_trial(
     tele.sim_steps_at_start = tele.sim_steps_fn()
     tele.reset_wall_time = time.time() - trial_start_time
     tele.start_time = time.time()
+    tele.post_gripper_hook = lambda: eg_vdm.read_proprio(env)
     tele.activate()
+    step3_state = eg_vdm.Step3State()
     obs["full_prompt"] = copy.deepcopy(obs["full_prompt"])
     _patch_libero_goal(env, obs)
 
@@ -898,6 +975,8 @@ def _run_single_trial(
         turn_start = time.time()
         tools_before = dict(tele.tool_calls)
         steps_before = tele.sim_steps()
+        proprio_before = eg_vdm.read_proprio(env)
+        events_before = len(tele.tool_events)
 
         # Record frame index before step
         frame_start = env.get_video_frame_count() if recording_frames else 0
@@ -908,6 +987,16 @@ def _run_single_trial(
         frame_end = env.get_video_frame_count() if recording_frames else 0
         turn_frame_ranges.append((frame_start, frame_end))
 
+        exec_wall_time = time.time() - turn_start
+        proprio_after = eg_vdm.read_proprio(env)
+        tool_calls_delta = {
+            k: v - tools_before.get(k, 0) for k, v in tele.tool_calls.items() if v - tools_before.get(k, 0)
+        }
+        sim_steps_delta = tele.sim_steps() - steps_before
+        exec_record = eg_vdm.build_exec_record(
+            code, info_step, tool_calls_delta, sim_steps_delta, proprio_before, proprio_after,
+            gripper_events=tele.tool_events[events_before:],
+        )
         turn_record: dict[str, Any] = {
             "turn_idx": tele.num_code_executions,
             "generated_code": code,
@@ -915,14 +1004,23 @@ def _run_single_trial(
             "stdout": info_step["stdout"],
             "stderr": info_step["stderr"],
             "code_exec_success": info_step["sandbox_rc"] == 0,
-            "exec_wall_time": time.time() - turn_start,
-            "sim_steps_delta": tele.sim_steps() - steps_before,
-            "tool_calls_delta": {
-                k: v - tools_before.get(k, 0) for k, v in tele.tool_calls.items() if v - tools_before.get(k, 0)
-            },
+            "exec_wall_time": exec_wall_time,
+            "sim_steps_delta": sim_steps_delta,
+            "tool_calls_delta": tool_calls_delta,
+            "exec_record": {k: v for k, v in exec_record.items() if k not in ("code", "stdout_tail")},
+            "proprio_before": proprio_before,
+            "proprio_after": proprio_after,
+            # Evaluation only: official check after this turn. Never placed in any prompt.
+            "turn_eval_success": bool(env.low_level_env.task_completed())
+            if hasattr(env.low_level_env, "task_completed") else None,
+            "turn_eval_reward": float(reward),
             "vdm_prompt": None,
             "vdm_output": None,
             "vdm_call_index": None,
+            "vdm_skipped_by_gate": None,
+            "vdm_verdict": None,
+            "vdm_verdict_source": None,
+            "step3_feedback": None,
             "decision_after": None,
             "decision_call_index": None,
         }
@@ -975,17 +1073,20 @@ def _run_single_trial(
                     turn_frames=turn_frames,
                     wrist_turn_frames=wrist_turn_frames,
                     wrist_base64_history=wrist_base64_history,
+                    mode=mode,
+                    exec_record=exec_record,
+                    step3_state=step3_state,
                 )
             except BudgetExceeded as exc:
                 if tele.last_vdm is not None:
-                    turn_record.update({k: tele.last_vdm[k] for k in ("vdm_prompt", "vdm_output", "vdm_call_index")})
+                    turn_record.update({k: v for k, v in tele.last_vdm.items() if k != "purpose"})
                 turn_record["turn_wall_time"] = time.time() - turn_start
                 tele.set_termination(exc.reason, exc.detail)
                 tele.save()
                 break
 
             if tele.last_vdm is not None:
-                turn_record.update({k: tele.last_vdm[k] for k in ("vdm_prompt", "vdm_output", "vdm_call_index")})
+                turn_record.update({k: v for k, v in tele.last_vdm.items() if k != "purpose"})
             turn_record["decision_after"] = decision
             turn_record["decision_call_index"] = tele.num_model_calls - 1
             turn_record["decision_raw_response"] = new_code if decision == "finish" else None

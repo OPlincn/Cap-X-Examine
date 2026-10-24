@@ -1,0 +1,1023 @@
+{
+  "task_name": "cube_restack",
+  "seed": 1,
+  "mode": "ablation",
+  "initial_state": {
+    "seed": 1,
+    "qpos_sha256_16": "78d82e7d47831db1",
+    "qpos": [
+      0.006912,
+      0.235441,
+      0.006608,
+      -2.654497,
+      0.018107,
+      2.954982,
+      -2.366934,
+      0.008387,
+      -0.00839,
+      -0.005467,
+      0.011902,
+      0.818507,
+      0.996254,
+      -9.9e-05,
+      -0.001139,
+      0.086471,
+      -0.015677,
+      0.011898,
+      0.854903,
+      -0.714862,
+      -0.00299,
+      0.002896,
+      0.699254
+    ]
+  },
+  "coding_model": "deepseek-v4.1-flash-1017",
+  "vdm_model": "qwen3.8-flash",
+  "budget": {
+    "max_turns": 8,
+    "max_model_calls": 16,
+    "max_total_tokens": 60000,
+    "max_sim_steps": 1500,
+    "max_wall_time_s": 600,
+    "max_completion_tokens": 8192
+  },
+  "termination_reason": "finish",
+  "termination_detail": "coding agent answered FINISH",
+  "timeout_or_budget_exceeded": false,
+  "budget_exceeded": null,
+  "turns": [
+    {
+      "turn_idx": 0,
+      "generated_code": "import numpy as np\n\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\n# Segment the red and green cubes\nred_masks = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\ngreen_masks = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\n\nred_best = max(red_masks, key=lambda d: d[\"score\"])\ngreen_best = max(green_masks, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\ngreen_mask = green_best[\"mask\"]\n\nprint(\"red box\", red_best[\"box\"], \"score\", red_best[\"score\"])\nprint(\"green box\", green_best[\"box\"], \"score\", green_best[\"score\"])\n```\n\n```python\ndef mask_to_world_points(mask, depth, K, cam_ext):\n    ys, xs = np.nonzero(mask)\n    zs = depth[ys, xs]\n    valid = zs > 0\n    xs, ys, zs = xs[valid], ys[valid], zs[valid]\n    fx, fy = K[0, 0], K[1, 1]\n    cx, cy = K[0, 2], K[1, 2]\n    xc = (xs - cx) * zs / fx\n    yc = (ys - cy) * zs / fy\n    pts_cam = np.stack([xc, yc, zs], axis=1)\n    pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)\n    pts_world = (cam_ext @ pts_cam_h.T).T[:, :3]\n    return pts_world\n\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\n\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\n\nprint(\"red center\", red_obb[\"center\"], \"extent\", red_obb[\"extent\"])\nprint(\"green center\", green_obb[\"center\"], \"extent\", green_obb[\"extent\"])\n```\n\n```python\n# Plan grasp for the green cube (top object) first\ngreen_seg = green_mask.astype(np.int32)\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=green_seg)\nbest_idx = grasp_scores.argmax()\nbest_T_cam = grasp_poses[best_idx]\nbest_T_world = cam_ext @ best_T_cam\nprint(\"green grasp world pos\", best_T_world[:3, 3])\nprint(\"green grasp score\", grasp_scores[best_idx])\n```\n\n```python\nfrom scipy.spatial.transform import Rotation as R\n\ndef quat_wxyz_from_mat(mat):\n    rot = R.from_matrix(mat[:3, :3])\n    q = rot.as_quat()  # xyzw\n    return np.array([q[3], q[0], q[1], q[2]])\n\n# Approach green cube from above\ngreen_center = green_obb[\"center\"]\ngrasp_pos = best_T_world[:3, 3]\ngrasp_quat = quat_wxyz_from_mat(best_T_world)\n\n# Move above the green cube\npre_pos = grasp_pos.copy()\npre_pos[2] += 0.10\njoints = solve_ik(pre_pos, grasp_quat)\nmove_to_joints(joints)\n\n# Descend to grasp\njoints = solve_ik(grasp_pos, grasp_quat)\nmove_to_joints(joints)\nclose_gripper()\n\n# Lift green cube\nlift_pos = grasp_pos.copy()\nlift_pos[2] += 0.15\njoints = solve_ik(lift_pos, grasp_quat)\nmove_to_joints(joints)\n```\n\n```python\n# Set green cube aside (to the side of the workspace)\nsetdown_pos = lift_pos.copy()\nsetdown_pos[0] += 0.15  # move sideways\njoints = solve_ik(setdown_pos, grasp_quat)\nmove_to_joints(joints)\n\n# Lower and release green cube\nplace_pos = setdown_pos.copy()\nplace_pos[2] -= 0.12\njoints = solve_ik(place_pos, grasp_quat)\nmove_to_joints(joints)\nopen_gripper()\n\n# Lift up away from green\nretreat_pos = place_pos.copy()\nretreat_pos[2] += 0.15\njoints = solve_ik(retreat_pos, grasp_quat)\nmove_to_joints(joints)\n```\n\n```python\n# Now grasp the red cube\nred_seg = red_mask.astype(np.int32)\nred_grasp_poses, red_grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_seg)\nred_best_idx = red_grasp_scores.argmax()\nred_T_world = cam_ext @ red_grasp_poses[red_best_idx]\nred_grasp_pos = red_T_world[:3, 3]\nred_grasp_quat = quat_wxyz_from_mat(red_T_world)\nprint(\"red grasp world pos\", red_grasp_pos, \"score\", red_grasp_scores[red_best_idx])\n\n# Approach red cube from above\nred_pre = red_grasp_pos.copy()\nred_pre[2] += 0.10\njoints = solve_ik(red_pre, red_grasp_quat)\nmove_to_joints(joints)\n\njoints = solve_ik(red_grasp_pos, red_grasp_quat)\nmove_to_joints(joints)\nclose_gripper()\n\n# Lift red cube\nred_lift = red_grasp_pos.copy()\nred_lift[2] += 0.15\njoints = solve_ik(red_lift, red_grasp_quat)\nmove_to_joints(joints)\n```\n\n```python\n# Place red cube on top of green cube (green is now at setdown location)\n# Green cube top height: place_pos z + half green extent\ngreen_top_z = place_pos[2] + green_obb[\"extent\"][2] / 2.0\nred_half_z = red_obb[\"extent\"][2] / 2.0\n\ntarget_xy = place_pos[:2]  # above green cube location\ntarget_z = green_top_z + red_half_z + 0.005\n\nabove_target = np.array([target_xy[0], target_xy[1], target_z + 0.12])\njoints = solve_ik(above_target, red_grasp_quat)\nmove_to_joints(joints)\n\nplace_target = np.array([target_xy[0], target_xy[1], target_z])\njoints = solve_ik(place_target, red_grasp_quat)\nmove_to_joints(joints)\n\nopen_gripper()\n\n# Retreat upward\nretreat = place_target.copy()\nretreat[2] += 0.15\njoints = solve_ik(retreat, red_grasp_quat)\nmove_to_joints(joints)",
+      "generated_by_call": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py\", line 196, in _exec_user_code\n    exec(code, self._exec_globals, self._exec_globals)\n  File \"<string>\", line 21\n    ```\n    ^\nSyntaxError: invalid syntax\n",
+      "code_exec_success": false,
+      "exec_wall_time": 0.019460439682006836,
+      "sim_steps_delta": 0,
+      "tool_calls_delta": {},
+      "exec_record": {
+        "exec_ok": false,
+        "exception": "SyntaxError: invalid syntax",
+        "error_line": 21,
+        "tool_calls": {},
+        "motion_calls": {
+          "move_to_joints": 0,
+          "open_gripper": 0,
+          "close_gripper": 0
+        },
+        "num_motion_calls": 0,
+        "sim_steps_delta": 0,
+        "proprio_before": {
+          "eef_xyz": [
+            0.4238,
+            0.0046,
+            0.1696
+          ],
+          "gripper_opening": 0.21
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.4238,
+            0.0046,
+            0.1696
+          ],
+          "gripper_opening": 0.21
+        },
+        "gripper_events": []
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.4238,
+          0.0046,
+          0.1696
+        ],
+        "gripper_opening": 0.21
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.4238,
+          0.0046,
+          0.1696
+        ],
+        "gripper_opening": 0.21
+      },
+      "turn_eval_success": false,
+      "turn_eval_reward": 0.003886741067860841,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_00.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_01.png"
+            },
+            {
+              "type": "text",
+              "text": "Generic verification checklist (apply before giving a verdict):\n1. Look at both images carefully and list every object that is relevant to the goal.\n2. A single 2D camera view can be misleading about height, depth and contact; objects that appear to overlap may be far apart, and an object near the gripper may or may not be held.\n3. Check the stacking order and vertical relation of the objects explicitly instead of assuming it from their screen positions.\n4. Check whether the gripper fingers are open or closed and whether an object is between them.\n5. Check whether the robot arm occludes any object that matters for the goal.\n6. Do not assume an action happened just because it would be the next logical step; describe only what is visible.\n7. If the evidence is ambiguous, prefer UNCERTAIN over guessing COMPLETE or NOT COMPLETE.\n8. Base the verdict only on what the two images show, and state the concrete visual evidence."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: none\nGripper & Occlusion Check: The gripper is open and located at the top of the workspace, not holding any object. There is no occlusion of the cubes by the arm. The vertical stacking relation shows the green cube resting on top of the red cube (green is higher than red).\nVerdict: NOT COMPLETE \u2014 The goal requires placing the red cube on top of the green cube, but the current state shows the green cube on top of the red cube, which is the reverse of the desired configuration.",
+      "vdm_call_index": 2,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "NOT COMPLETE",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Generic Verification Checklist]\n- The assessment below was produced by a visual verification module that compared the previous and current camera images.\n- A single 2D view can be ambiguous about height, contact and stacking order.\n- Check the gripper state and object relations before deciding on the next action.\n- Prefer verifying with perception over assuming the outcome of an action.\n[Visual Differencing Assessment]\nPhysical Change: none\nGripper & Occlusion Check: The gripper is open and located at the top of the workspace, not holding any object. There is no occlusion of the cubes by the arm. The vertical stacking relation shows the green cube resting on top of the red cube (green is higher than red).\nVerdict: NOT COMPLETE \u2014 The goal requires placing the red cube on top of the green cube, but the current state shows the green cube on top of the red cube, which is the reverse of the desired configuration.",
+      "decision_after": "regenerate",
+      "decision_call_index": 3,
+      "initial_scene_vdm": {
+        "purpose": "vdm_initial",
+        "vdm_prompt": [
+          {
+            "role": "system",
+            "content": "You are a helpful assistant that describes the initial state of the environment with the goal of the task in mind. You should try to provide objective information and no assumptions. Do *NOT* write any code."
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+              },
+              {
+                "type": "text",
+                "text": "Describe the initial state of the environment with the goal of the task in mind. You should try to provide objective information and no assumptions. Do *NOT* write any code."
+              },
+              {
+                "type": "text",
+                "text": "Main camera view:"
+              },
+              {
+                "type": "image",
+                "file": "visual_feedback_00.png"
+              }
+            ]
+          }
+        ],
+        "vdm_output": "The initial state of the environment is as follows:\n\n1.  **Robot State**: A Franka Emika robot arm with a parallel-jaw gripper is positioned at the top center of the view, facing downwards towards the workspace. The gripper appears to be in an open or neutral position.\n2.  **Workspace**: There is a flat, white surface (likely a table) occupying the majority of the lower portion of the image. Behind it, there is a gray wall and a tiled floor area visible near the top.\n3.  **Objects**: Two cubes are located on the white surface in the center of the workspace.\n    *   One cube is red.\n    *   One cube is green.\n4.  **Object Configuration**: The green cube is currently resting on top of the red cube. They are stacked vertically.\n5.  **Goal Context**: The task requires placing the red cube on top of the green cube. Currently, the configuration is the opposite (green on red). This implies the robot needs to manipulate the stack, likely by picking up the top object (green), setting it aside or holding it, picking up the bottom object (red), and then placing the red one onto the green one.",
+        "vdm_call_index": 0
+      },
+      "decision_raw_response": null,
+      "turn_wall_time": 20.442026376724243
+    },
+    {
+      "turn_idx": 1,
+      "generated_code": "import numpy as np\nfrom scipy.spatial.transform import Rotation as R\n\ndef quat_wxyz_from_mat(mat):\n    rot = R.from_matrix(mat[:3, :3])\n    q = rot.as_quat()  # xyzw\n    return np.array([q[3], q[0], q[1], q[2]])\n\ndef mask_to_world_points(mask, depth, K, cam_ext):\n    ys, xs = np.nonzero(mask)\n    zs = depth[ys, xs]\n    valid = zs > 0\n    xs, ys, zs = xs[valid], ys[valid], zs[valid]\n    fx, fy = K[0, 0], K[1, 1]\n    cx, cy = K[0, 2], K[1, 2]\n    xc = (xs - cx) * zs / fx\n    yc = (ys - cy) * zs / fy\n    pts_cam = np.stack([xc, yc, zs], axis=1)\n    pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)\n    pts_world = (cam_ext @ pts_cam_h.T).T[:, :3]\n    return pts_world\n\n# Get fresh observation\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\n# Segment cubes\nred_masks = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\ngreen_masks = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\nred_best = max(red_masks, key=lambda d: d[\"score\"])\ngreen_best = max(green_masks, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\ngreen_mask = green_best[\"mask\"]\n\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\n\nred_center = red_obb[\"center\"]\ngreen_center = green_obb[\"center\"]\nred_extent = red_obb[\"extent\"]\ngreen_extent = green_obb[\"extent\"]\nprint(\"red center\", red_center, \"extent\", red_extent)\nprint(\"green center\", green_center, \"extent\", green_extent)\n\n# Determine which is on top by z\nif red_center[2] > green_center[2]:\n    top_mask, top_obb, top_name = red_mask, red_obb, \"red\"\n    bottom_mask, bottom_obb, bottom_name = green_mask, green_obb, \"green\"\nelse:\n    top_mask, top_obb, top_name = green_mask, green_obb, \"green\"\n    bottom_mask, bottom_obb, bottom_name = red_mask, red_obb, \"red\"\nprint(\"top:\", top_name, \"bottom:\", bottom_name)\n\n# Grasp the top cube\ntop_seg = top_mask.astype(np.int32)\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=top_seg)\nbest_idx = grasp_scores.argmax()\ntop_T_world = cam_ext @ grasp_poses[best_idx]\ntop_grasp_pos = top_T_world[:3, 3]\ntop_grasp_quat = quat_wxyz_from_mat(top_T_world)\n\n# Approach and grasp top cube\npre = top_grasp_pos.copy(); pre[2] += 0.10\nmove_to_joints(solve_ik(pre, top_grasp_quat))\nmove_to_joints(solve_ik(top_grasp_pos, top_grasp_quat))\nclose_gripper()\n\n# Lift top cube\nlift = top_grasp_pos.copy(); lift[2] += 0.20\nmove_to_joints(solve_ik(lift, top_grasp_quat))\n\n# Move top cube aside (away from bottom cube)\nsetdown = lift.copy()\nsetdown[0] += 0.20\nmove_to_joints(solve_ik(setdown, top_grasp_quat))\nlower = setdown.copy(); lower[2] -= 0.15\nmove_to_joints(solve_ik(lower, top_grasp_quat))\nopen_gripper()\nretreat = lower.copy(); retreat[2] += 0.15\nmove_to_joints(solve_ik(retreat, top_grasp_quat))\n\n# Now grasp the bottom cube (which is now exposed)\nbottom_seg = bottom_mask.astype(np.int32)\nb_poses, b_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=bottom_seg)\nb_idx = b_scores.argmax()\nb_T_world = cam_ext @ b_poses[b_idx]\nb_grasp_pos = b_T_world[:3, 3]\nb_grasp_quat = quat_wxyz_from_mat(b_T_world)\n\nb_pre = b_grasp_pos.copy(); b_pre[2] += 0.10\nmove_to_joints(solve_ik(b_pre, b_grasp_quat))\nmove_to_joints(solve_ik(b_grasp_pos, b_grasp_quat))\nclose_gripper()\n\nb_lift = b_grasp_pos.copy(); b_lift[2] += 0.20\nmove_to_joints(solve_ik(b_lift, b_grasp_quat))\n\n# Place bottom cube on top of the top cube (now at setdown location)\ntop_top_z = lower[2] + top_obb[\"extent\"][2] / 2.0\nbottom_half_z = bottom_obb[\"extent\"][2] / 2.0\ntarget_xy = lower[:2]\ntarget_z = top_top_z + bottom_half_z + 0.005\n\nabove_target = np.array([target_xy[0], target_xy[1], target_z + 0.12])\nmove_to_joints(solve_ik(above_target, b_grasp_quat))\nplace_target = np.array([target_xy[0], target_xy[1], target_z])\nmove_to_joints(solve_ik(place_target, b_grasp_quat))\nopen_gripper()\nfinal_retreat = place_target.copy(); final_retreat[2] += 0.15\nmove_to_joints(solve_ik(final_retreat, b_grasp_quat))",
+      "generated_by_call": 3,
+      "stdout": "red center [ 0.56598857  0.00877519 -0.0979039 ] extent [0.05547031 0.05156394 0.03636854]\ngreen center [ 0.55334422  0.01263214 -0.05562718] extent [0.0586203  0.04578799 0.02898857]\ntop: green bottom: red\n",
+      "stderr": "",
+      "code_exec_success": true,
+      "exec_wall_time": 10.485957622528076,
+      "sim_steps_delta": 461,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 2,
+        "get_oriented_bounding_box_from_3d_points": 2,
+        "plan_grasp": 2,
+        "solve_ik": 12,
+        "move_to_joints": 12,
+        "close_gripper": 2,
+        "open_gripper": 2
+      },
+      "exec_record": {
+        "exec_ok": true,
+        "exception": null,
+        "error_line": null,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 2,
+          "get_oriented_bounding_box_from_3d_points": 2,
+          "plan_grasp": 2,
+          "solve_ik": 12,
+          "move_to_joints": 12,
+          "close_gripper": 2,
+          "open_gripper": 2
+        },
+        "motion_calls": {
+          "move_to_joints": 12,
+          "open_gripper": 2,
+          "close_gripper": 2
+        },
+        "num_motion_calls": 16,
+        "sim_steps_delta": 461,
+        "proprio_before": {
+          "eef_xyz": [
+            0.4238,
+            0.0046,
+            0.1696
+          ],
+          "gripper_opening": 0.21
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.7526,
+            -0.0965,
+            0.1684
+          ],
+          "gripper_opening": 0.966
+        },
+        "gripper_events": [
+          {
+            "turn_idx": 1,
+            "call": "close_gripper",
+            "eef_xyz": [
+              0.521,
+              -0.0231,
+              0.0258
+            ],
+            "gripper_opening": 0.559
+          },
+          {
+            "turn_idx": 1,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.7211,
+              -0.0231,
+              0.0757
+            ],
+            "gripper_opening": 0.974
+          },
+          {
+            "turn_idx": 1,
+            "call": "close_gripper",
+            "eef_xyz": [
+              0.5567,
+              -0.097,
+              -0.0152
+            ],
+            "gripper_opening": -0.001
+          },
+          {
+            "turn_idx": 1,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.735,
+              -0.0919,
+              0.0329
+            ],
+            "gripper_opening": 0.958
+          }
+        ]
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.4238,
+          0.0046,
+          0.1696
+        ],
+        "gripper_opening": 0.21
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.7526,
+          -0.0965,
+          0.1684
+        ],
+        "gripper_opening": 0.966
+      },
+      "turn_eval_success": false,
+      "turn_eval_reward": 0.0002480882396300871,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_01.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_02.png"
+            },
+            {
+              "type": "text",
+              "text": "Generic verification checklist (apply before giving a verdict):\n1. Look at both images carefully and list every object that is relevant to the goal.\n2. A single 2D camera view can be misleading about height, depth and contact; objects that appear to overlap may be far apart, and an object near the gripper may or may not be held.\n3. Check the stacking order and vertical relation of the objects explicitly instead of assuming it from their screen positions.\n4. Check whether the gripper fingers are open or closed and whether an object is between them.\n5. Check whether the robot arm occludes any object that matters for the goal.\n6. Do not assume an action happened just because it would be the next logical step; describe only what is visible.\n7. If the evidence is ambiguous, prefer UNCERTAIN over guessing COMPLETE or NOT COMPLETE.\n8. Base the verdict only on what the two images show, and state the concrete visual evidence."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: The red cube has been lifted off the table and is now positioned near the robot gripper, while the green cube remains on the table surface.\nGripper & Occlusion Check: The gripper appears to be holding or supporting the red cube between its fingers. The green cube is clearly visible on the table below the red cube, indicating that the red cube is not resting on top of the green cube.\nVerdict: NOT COMPLETE \u2014 The red cube is being held by the gripper above the table, rather than being placed on top of the green cube.",
+      "vdm_call_index": 4,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "NOT COMPLETE",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Generic Verification Checklist]\n- The assessment below was produced by a visual verification module that compared the previous and current camera images.\n- A single 2D view can be ambiguous about height, contact and stacking order.\n- Check the gripper state and object relations before deciding on the next action.\n- Prefer verifying with perception over assuming the outcome of an action.\n[Visual Differencing Assessment]\nPhysical Change: The red cube has been lifted off the table and is now positioned near the robot gripper, while the green cube remains on the table surface.\nGripper & Occlusion Check: The gripper appears to be holding or supporting the red cube between its fingers. The green cube is clearly visible on the table below the red cube, indicating that the red cube is not resting on top of the green cube.\nVerdict: NOT COMPLETE \u2014 The red cube is being held by the gripper above the table, rather than being placed on top of the green cube.",
+      "decision_after": "regenerate",
+      "decision_call_index": 5,
+      "decision_raw_response": null,
+      "turn_wall_time": 26.163827180862427
+    },
+    {
+      "turn_idx": 2,
+      "generated_code": "import numpy as np\nfrom scipy.spatial.transform import Rotation as R\n\ndef quat_wxyz_from_mat(mat):\n    rot = R.from_matrix(mat[:3, :3])\n    q = rot.as_quat()  # xyzw\n    return np.array([q[3], q[0], q[1], q[2]])\n\ndef mask_to_world_points(mask, depth, K, cam_ext):\n    ys, xs = np.nonzero(mask)\n    zs = depth[ys, xs]\n    valid = zs > 0\n    xs, ys, zs = xs[valid], ys[valid], zs[valid]\n    fx, fy = K[0, 0], K[1, 1]\n    cx, cy = K[0, 2], K[1, 2]\n    xc = (xs - cx) * zs / fx\n    yc = (ys - cy) * zs / fy\n    pts_cam = np.stack([xc, yc, zs], axis=1)\n    pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)\n    pts_world = (cam_ext @ pts_cam_h.T).T[:, :3]\n    return pts_world\n\n# Fresh observation\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\nred_masks = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\ngreen_masks = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\nred_best = max(red_masks, key=lambda d: d[\"score\"])\ngreen_best = max(green_masks, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\ngreen_mask = green_best[\"mask\"]\n\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\n\nred_center = red_obb[\"center\"]\ngreen_center = green_obb[\"center\"]\nred_extent = red_obb[\"extent\"]\ngreen_extent = green_obb[\"extent\"]\nprint(\"red center\", red_center, \"extent\", red_extent)\nprint(\"green center\", green_center, \"extent\", green_extent)\n\n# The red cube is currently held by the gripper. Place it on top of the green cube.\n# Green cube top surface z:\ngreen_top_z = green_center[2] + green_extent[2] / 2.0\nred_half_z = red_extent[2] / 2.0\ntarget_z = green_top_z + red_half_z + 0.005\n\ntarget_xy = green_center[:2]\n\n# Use a downward-facing orientation for placing\nplace_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity wxyz (gripper pointing down depends on convention)\n\n# Move above target\nabove_target = np.array([target_xy[0], target_xy[1], target_z + 0.15])\nmove_to_joints(solve_ik(above_target, place_quat))\n\n# Descend to place\nplace_target = np.array([target_xy[0], target_xy[1], target_z])\nmove_to_joints(solve_ik(place_target, place_quat))\n\n# Open gripper to release\nopen_gripper()\n\n# Retreat upward\nretreat = place_target.copy()\nretreat[2] += 0.15\nmove_to_joints(solve_ik(retreat, place_quat))",
+      "generated_by_call": 5,
+      "stdout": "red center [ 0.52430581  0.00157867 -0.09533306] extent [0.06087719 0.05194816 0.04676024]\ngreen center [ 0.75311965 -0.004977   -0.09664505] extent [0.0638898  0.05777709 0.04979889]\n",
+      "stderr": "",
+      "code_exec_success": true,
+      "exec_wall_time": 4.01629900932312,
+      "sim_steps_delta": 124,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 2,
+        "get_oriented_bounding_box_from_3d_points": 2,
+        "solve_ik": 3,
+        "move_to_joints": 3,
+        "open_gripper": 1
+      },
+      "exec_record": {
+        "exec_ok": true,
+        "exception": null,
+        "error_line": null,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 2,
+          "get_oriented_bounding_box_from_3d_points": 2,
+          "solve_ik": 3,
+          "move_to_joints": 3,
+          "open_gripper": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 3,
+          "open_gripper": 1,
+          "close_gripper": 0
+        },
+        "num_motion_calls": 4,
+        "sim_steps_delta": 124,
+        "proprio_before": {
+          "eef_xyz": [
+            0.7526,
+            -0.0965,
+            0.1684
+          ],
+          "gripper_opening": 0.966
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.7144,
+            -0.0043,
+            0.1112
+          ],
+          "gripper_opening": 0.989
+        },
+        "gripper_events": [
+          {
+            "turn_idx": 2,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.7007,
+              -0.0074,
+              0.0071
+            ],
+            "gripper_opening": 0.99
+          }
+        ]
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.7526,
+          -0.0965,
+          0.1684
+        ],
+        "gripper_opening": 0.966
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.7144,
+          -0.0043,
+          0.1112
+        ],
+        "gripper_opening": 0.989
+      },
+      "turn_eval_success": false,
+      "turn_eval_reward": 0.00020690728253706936,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_02.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_03.png"
+            },
+            {
+              "type": "text",
+              "text": "Generic verification checklist (apply before giving a verdict):\n1. Look at both images carefully and list every object that is relevant to the goal.\n2. A single 2D camera view can be misleading about height, depth and contact; objects that appear to overlap may be far apart, and an object near the gripper may or may not be held.\n3. Check the stacking order and vertical relation of the objects explicitly instead of assuming it from their screen positions.\n4. Check whether the gripper fingers are open or closed and whether an object is between them.\n5. Check whether the robot arm occludes any object that matters for the goal.\n6. Do not assume an action happened just because it would be the next logical step; describe only what is visible.\n7. If the evidence is ambiguous, prefer UNCERTAIN over guessing COMPLETE or NOT COMPLETE.\n8. Base the verdict only on what the two images show, and state the concrete visual evidence."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: The robot arm has moved significantly, changing its pose and position relative to the camera. In the previous image, the red cube was visible near the gripper; in the current image, the red cube is no longer visible, while the green cube remains on the table surface at the bottom of the frame.\nGripper & Occlusion Check: The gripper fingers are open. There is no object currently held between them. The red cube is completely occluded by the robot arm or out of the field of view, making it impossible to verify if it is stacked on the green cube. The green cube is visible but isolated from any other objects in the view.\nVerdict: UNCERTAIN \u2014 The red cube is not visible due to occlusion by the robot arm, so it cannot be confirmed whether it has been successfully placed on top of the green cube.",
+      "vdm_call_index": 6,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "UNCERTAIN",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Generic Verification Checklist]\n- The assessment below was produced by a visual verification module that compared the previous and current camera images.\n- A single 2D view can be ambiguous about height, contact and stacking order.\n- Check the gripper state and object relations before deciding on the next action.\n- Prefer verifying with perception over assuming the outcome of an action.\n[Visual Differencing Assessment]\nPhysical Change: The robot arm has moved significantly, changing its pose and position relative to the camera. In the previous image, the red cube was visible near the gripper; in the current image, the red cube is no longer visible, while the green cube remains on the table surface at the bottom of the frame.\nGripper & Occlusion Check: The gripper fingers are open. There is no object currently held between them. The red cube is completely occluded by the robot arm or out of the field of view, making it impossible to verify if it is stacked on the green cube. The green cube is visible but isolated from any other objects in the view.\nVerdict: UNCERTAIN \u2014 The red cube is not visible due to occlusion by the robot arm, so it cannot be confirmed whether it has been successfully placed on top of the green cube.",
+      "decision_after": "regenerate",
+      "decision_call_index": 7,
+      "decision_raw_response": null,
+      "turn_wall_time": 21.605209350585938
+    },
+    {
+      "turn_idx": 3,
+      "generated_code": "import numpy as np\nfrom scipy.spatial.transform import Rotation as R\n\ndef quat_wxyz_from_mat(mat):\n    rot = R.from_matrix(mat[:3, :3])\n    q = rot.as_quat()  # xyzw\n    return np.array([q[3], q[0], q[1], q[2]])\n\ndef mask_to_world_points(mask, depth, K, cam_ext):\n    ys, xs = np.nonzero(mask)\n    zs = depth[ys, xs]\n    valid = zs > 0\n    xs, ys, zs = xs[valid], ys[valid], zs[valid]\n    fx, fy = K[0, 0], K[1, 1]\n    cx, cy = K[0, 2], K[1, 2]\n    xc = (xs - cx) * zs / fx\n    yc = (ys - cy) * zs / fy\n    pts_cam = np.stack([xc, yc, zs], axis=1)\n    pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)\n    pts_world = (cam_ext @ pts_cam_h.T).T[:, :3]\n    return pts_world\n\n# Move arm away so camera can see the scene clearly\nretreat_quat = np.array([1.0, 0.0, 0.0, 0.0])\nretreat_pos = np.array([0.5, 0.0, 0.4])\nmove_to_joints(solve_ik(retreat_pos, retreat_quat))\n\n# Fresh observation\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\nred_masks = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\ngreen_masks = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\nred_best = max(red_masks, key=lambda d: d[\"score\"])\ngreen_best = max(green_masks, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\ngreen_mask = green_best[\"mask\"]\n\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\n\nred_center = red_obb[\"center\"]\ngreen_center = green_obb[\"center\"]\nred_extent = red_obb[\"extent\"]\ngreen_extent = green_obb[\"extent\"]\nprint(\"red center\", red_center, \"extent\", red_extent)\nprint(\"green center\", green_center, \"extent\", green_extent)\n\n# Check if red is already on top of green\nxy_dist = np.linalg.norm(red_center[:2] - green_center[:2])\nz_diff = red_center[2] - green_center[2]\nprint(\"xy_dist\", xy_dist, \"z_diff\", z_diff)\n\nif xy_dist < 0.03 and z_diff > 0.03:\n    print(\"Red cube already on top of green cube. Opening gripper.\")\n    open_gripper()\nelse:\n    # Need to place red on green. First grasp red cube.\n    red_seg = red_mask.astype(np.int32)\n    r_poses, r_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_seg)\n    r_idx = r_scores.argmax()\n    r_T_world = cam_ext @ r_poses[r_idx]\n    r_grasp_pos = r_T_world[:3, 3]\n    r_grasp_quat = quat_wxyz_from_mat(r_T_world)\n\n    r_pre = r_grasp_pos.copy(); r_pre[2] += 0.10\n    move_to_joints(solve_ik(r_pre, r_grasp_quat))\n    move_to_joints(solve_ik(r_grasp_pos, r_grasp_quat))\n    close_gripper()\n\n    r_lift = r_grasp_pos.copy(); r_lift[2] += 0.20\n    move_to_joints(solve_ik(r_lift, r_grasp_quat))\n\n    # Place on top of green\n    green_top_z = green_center[2] + green_extent[2] / 2.0\n    red_half_z = red_extent[2] / 2.0\n    target_z = green_top_z + red_half_z + 0.005\n    target_xy = green_center[:2]\n\n    above_target = np.array([target_xy[0], target_xy[1], target_z + 0.12])\n    move_to_joints(solve_ik(above_target, r_grasp_quat))\n    place_target = np.array([target_xy[0], target_xy[1], target_z])\n    move_to_joints(solve_ik(place_target, r_grasp_quat))\n    open_gripper()\n\n    final_retreat = place_target.copy(); final_retreat[2] += 0.15\n    move_to_joints(solve_ik(final_retreat, r_grasp_quat))",
+      "generated_by_call": 7,
+      "stdout": "red center [ 0.52617291  0.00464729 -0.09164852] extent [0.05894307 0.04513136 0.03300871]\ngreen center [ 0.79156365 -0.04066389 -0.08163297] extent [0.04805976 0.02565352 0.00067073]\nxy_dist 0.2692310308926769 z_diff -0.010015547494197155\n",
+      "stderr": "",
+      "code_exec_success": true,
+      "exec_wall_time": 7.250072956085205,
+      "sim_steps_delta": 302,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 2,
+        "get_oriented_bounding_box_from_3d_points": 2,
+        "plan_grasp": 1,
+        "solve_ik": 7,
+        "move_to_joints": 7,
+        "close_gripper": 1,
+        "open_gripper": 1
+      },
+      "exec_record": {
+        "exec_ok": true,
+        "exception": null,
+        "error_line": null,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 2,
+          "get_oriented_bounding_box_from_3d_points": 2,
+          "plan_grasp": 1,
+          "solve_ik": 7,
+          "move_to_joints": 7,
+          "close_gripper": 1,
+          "open_gripper": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 7,
+          "open_gripper": 1,
+          "close_gripper": 1
+        },
+        "num_motion_calls": 9,
+        "sim_steps_delta": 302,
+        "proprio_before": {
+          "eef_xyz": [
+            0.7144,
+            -0.0043,
+            0.1112
+          ],
+          "gripper_opening": 0.989
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.7722,
+            -0.0826,
+            0.183
+          ],
+          "gripper_opening": 0.985
+        },
+        "gripper_events": [
+          {
+            "turn_idx": 3,
+            "call": "close_gripper",
+            "eef_xyz": [
+              0.4956,
+              -0.0411,
+              0.0005
+            ],
+            "gripper_opening": 0.582
+          },
+          {
+            "turn_idx": 3,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.7717,
+              -0.0834,
+              0.0379
+            ],
+            "gripper_opening": 0.976
+          }
+        ]
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.7144,
+          -0.0043,
+          0.1112
+        ],
+        "gripper_opening": 0.989
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.7722,
+          -0.0826,
+          0.183
+        ],
+        "gripper_opening": 0.985
+      },
+      "turn_eval_success": true,
+      "turn_eval_reward": 1.0,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_03.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_04.png"
+            },
+            {
+              "type": "text",
+              "text": "Generic verification checklist (apply before giving a verdict):\n1. Look at both images carefully and list every object that is relevant to the goal.\n2. A single 2D camera view can be misleading about height, depth and contact; objects that appear to overlap may be far apart, and an object near the gripper may or may not be held.\n3. Check the stacking order and vertical relation of the objects explicitly instead of assuming it from their screen positions.\n4. Check whether the gripper fingers are open or closed and whether an object is between them.\n5. Check whether the robot arm occludes any object that matters for the goal.\n6. Do not assume an action happened just because it would be the next logical step; describe only what is visible.\n7. If the evidence is ambiguous, prefer UNCERTAIN over guessing COMPLETE or NOT COMPLETE.\n8. Base the verdict only on what the two images show, and state the concrete visual evidence."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: The robot arm has moved significantly, changing its position and orientation relative to the camera. A red cube is now visible in the lower part of the frame, positioned near a green object (partially visible at the bottom edge).\nGripper & Occlusion Check: The gripper fingers are not clearly visible due to the angle and occlusion by the wrist/arm structure, but they appear to be open or empty as no object is held between them. The red cube is resting on the surface (or potentially on the green cube), located below the arm. The vertical stacking relation between the red and green cubes is ambiguous from this single view; the red cube appears to be in front of or on top of the green one, but depth perception is limited.\nVerdict: NOT COMPLETE \u2014 The red cube is visible near the bottom of the frame, but it is not clearly stacked on top of the green cube with certainty, and the gripper's final state (open) cannot be definitively confirmed due to occlusion.",
+      "vdm_call_index": 8,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "NOT COMPLETE",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Generic Verification Checklist]\n- The assessment below was produced by a visual verification module that compared the previous and current camera images.\n- A single 2D view can be ambiguous about height, contact and stacking order.\n- Check the gripper state and object relations before deciding on the next action.\n- Prefer verifying with perception over assuming the outcome of an action.\n[Visual Differencing Assessment]\nPhysical Change: The robot arm has moved significantly, changing its position and orientation relative to the camera. A red cube is now visible in the lower part of the frame, positioned near a green object (partially visible at the bottom edge).\nGripper & Occlusion Check: The gripper fingers are not clearly visible due to the angle and occlusion by the wrist/arm structure, but they appear to be open or empty as no object is held between them. The red cube is resting on the surface (or potentially on the green cube), located below the arm. The vertical stacking relation between the red and green cubes is ambiguous from this single view; the red cube appears to be in front of or on top of the green one, but depth perception is limited.\nVerdict: NOT COMPLETE \u2014 The red cube is visible near the bottom of the frame, but it is not clearly stacked on top of the green cube with certainty, and the gripper's final state (open) cannot be definitively confirmed due to occlusion.",
+      "decision_after": "regenerate",
+      "decision_call_index": 9,
+      "decision_raw_response": null,
+      "turn_wall_time": 25.20679497718811
+    },
+    {
+      "turn_idx": 4,
+      "generated_code": "import numpy as np\nfrom scipy.spatial.transform import Rotation as R\n\ndef quat_wxyz_from_mat(mat):\n    rot = R.from_matrix(mat[:3, :3])\n    q = rot.as_quat()  # xyzw\n    return np.array([q[3], q[0], q[1], q[2]])\n\ndef mask_to_world_points(mask, depth, K, cam_ext):\n    ys, xs = np.nonzero(mask)\n    zs = depth[ys, xs]\n    valid = zs > 0\n    xs, ys, zs = xs[valid], ys[valid], zs[valid]\n    fx, fy = K[0, 0], K[1, 1]\n    cx, cy = K[0, 2], K[1, 2]\n    xc = (xs - cx) * zs / fx\n    yc = (ys - cy) * zs / fy\n    pts_cam = np.stack([xc, yc, zs], axis=1)\n    pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)\n    pts_world = (cam_ext @ pts_cam_h.T).T[:, :3]\n    return pts_world\n\n# Fresh observation\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\nred_masks = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\ngreen_masks = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\nred_best = max(red_masks, key=lambda d: d[\"score\"])\ngreen_best = max(green_masks, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\ngreen_mask = green_best[\"mask\"]\n\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\n\nred_center = red_obb[\"center\"]\ngreen_center = green_obb[\"center\"]\nred_extent = red_obb[\"extent\"]\ngreen_extent = green_obb[\"extent\"]\nprint(\"red center\", red_center, \"extent\", red_extent)\nprint(\"green center\", green_center, \"extent\", green_extent)\n\nxy_dist = np.linalg.norm(red_center[:2] - green_center[:2])\nz_diff = red_center[2] - green_center[2]\nprint(\"xy_dist\", xy_dist, \"z_diff\", z_diff)\n\n# Grasp red cube\nred_seg = red_mask.astype(np.int32)\nr_poses, r_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_seg)\nr_idx = r_scores.argmax()\nr_T_world = cam_ext @ r_poses[r_idx]\nr_grasp_pos = r_T_world[:3, 3]\nr_grasp_quat = quat_wxyz_from_mat(r_T_world)\n\nr_pre = r_grasp_pos.copy(); r_pre[2] += 0.10\nmove_to_joints(solve_ik(r_pre, r_grasp_quat))\nmove_to_joints(solve_ik(r_grasp_pos, r_grasp_quat))\nclose_gripper()\n\nr_lift = r_grasp_pos.copy(); r_lift[2] += 0.20\nmove_to_joints(solve_ik(r_lift, r_grasp_quat))\n\n# Place red on top of green\ngreen_top_z = green_center[2] + green_extent[2] / 2.0\nred_half_z = red_extent[2] / 2.0\ntarget_z = green_top_z + red_half_z + 0.005\ntarget_xy = green_center[:2]\n\nabove_target = np.array([target_xy[0], target_xy[1], target_z + 0.12])\nmove_to_joints(solve_ik(above_target, r_grasp_quat))\nplace_target = np.array([target_xy[0], target_xy[1], target_z])\nmove_to_joints(solve_ik(place_target, r_grasp_quat))\nopen_gripper()\n\nfinal_retreat = place_target.copy(); final_retreat[2] += 0.15\nmove_to_joints(solve_ik(final_retreat, r_grasp_quat))",
+      "generated_by_call": 9,
+      "stdout": "red center [ 0.78758801 -0.03332473 -0.05527701] extent [0.06043861 0.05088221 0.04689557]\ngreen center [ 0.79983085 -0.05917097 -0.08169082] extent [0.01078637 0.00744948 0.00049204]\nxy_dist 0.02859921664676224 z_diff 0.026413806282685137\n",
+      "stderr": "",
+      "code_exec_success": true,
+      "exec_wall_time": 6.17119026184082,
+      "sim_steps_delta": 204,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 2,
+        "get_oriented_bounding_box_from_3d_points": 2,
+        "plan_grasp": 1,
+        "solve_ik": 6,
+        "move_to_joints": 6,
+        "close_gripper": 1,
+        "open_gripper": 1
+      },
+      "exec_record": {
+        "exec_ok": true,
+        "exception": null,
+        "error_line": null,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 2,
+          "get_oriented_bounding_box_from_3d_points": 2,
+          "plan_grasp": 1,
+          "solve_ik": 6,
+          "move_to_joints": 6,
+          "close_gripper": 1,
+          "open_gripper": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 6,
+          "open_gripper": 1,
+          "close_gripper": 1
+        },
+        "num_motion_calls": 8,
+        "sim_steps_delta": 204,
+        "proprio_before": {
+          "eef_xyz": [
+            0.7722,
+            -0.0826,
+            0.183
+          ],
+          "gripper_opening": 0.985
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.7044,
+            -0.0267,
+            0.1763
+          ],
+          "gripper_opening": 1.001
+        },
+        "gripper_events": [
+          {
+            "turn_idx": 4,
+            "call": "close_gripper",
+            "eef_xyz": [
+              0.6962,
+              -0.0078,
+              0.0402
+            ],
+            "gripper_opening": 0.123
+          },
+          {
+            "turn_idx": 4,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.6932,
+              -0.0261,
+              0.0489
+            ],
+            "gripper_opening": 1.0
+          }
+        ]
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.7722,
+          -0.0826,
+          0.183
+        ],
+        "gripper_opening": 0.985
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.7044,
+          -0.0267,
+          0.1763
+        ],
+        "gripper_opening": 1.001
+      },
+      "turn_eval_success": true,
+      "turn_eval_reward": 1.0,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_04.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_05.png"
+            },
+            {
+              "type": "text",
+              "text": "Generic verification checklist (apply before giving a verdict):\n1. Look at both images carefully and list every object that is relevant to the goal.\n2. A single 2D camera view can be misleading about height, depth and contact; objects that appear to overlap may be far apart, and an object near the gripper may or may not be held.\n3. Check the stacking order and vertical relation of the objects explicitly instead of assuming it from their screen positions.\n4. Check whether the gripper fingers are open or closed and whether an object is between them.\n5. Check whether the robot arm occludes any object that matters for the goal.\n6. Do not assume an action happened just because it would be the next logical step; describe only what is visible.\n7. If the evidence is ambiguous, prefer UNCERTAIN over guessing COMPLETE or NOT COMPLETE.\n8. Base the verdict only on what the two images show, and state the concrete visual evidence."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: The robot arm has moved upwards and away from the red cube. The gripper fingers are now open, whereas they were previously closed around the object.\nGripper & Occlusion Check: The gripper is open and empty. The red cube is visible at the bottom of the frame, resting on top of a green surface (presumably the green cube). The vertical stacking relation appears correct (red on green), but the contact point is partially obscured by the bottom edge of the image frame.\nVerdict: COMPLETE \u2014 The red cube is positioned on top of the green cube and the gripper has opened to release it, satisfying the goal conditions.",
+      "vdm_call_index": 10,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "COMPLETE",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Generic Verification Checklist]\n- The assessment below was produced by a visual verification module that compared the previous and current camera images.\n- A single 2D view can be ambiguous about height, contact and stacking order.\n- Check the gripper state and object relations before deciding on the next action.\n- Prefer verifying with perception over assuming the outcome of an action.\n[Visual Differencing Assessment]\nPhysical Change: The robot arm has moved upwards and away from the red cube. The gripper fingers are now open, whereas they were previously closed around the object.\nGripper & Occlusion Check: The gripper is open and empty. The red cube is visible at the bottom of the frame, resting on top of a green surface (presumably the green cube). The vertical stacking relation appears correct (red on green), but the contact point is partially obscured by the bottom edge of the image frame.\nVerdict: COMPLETE \u2014 The red cube is positioned on top of the green cube and the gripper has opened to release it, satisfying the goal conditions.",
+      "decision_after": "finish",
+      "decision_call_index": 11,
+      "decision_raw_response": "FINISH",
+      "turn_wall_time": 17.002974033355713
+    }
+  ],
+  "model_calls": [
+    {
+      "role": "vdm",
+      "purpose": "vdm_initial",
+      "turn_idx": 0,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2186,
+      "output_tokens": 256,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 2875,
+      "latency_s": 10.919534683227539,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "initial_code",
+      "turn_idx": 0,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 2035,
+      "output_tokens": 1663,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 2757,
+      "latency_s": 13.138512372970581,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ablation",
+      "turn_idx": 0,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2772,
+      "output_tokens": 111,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3769,
+      "latency_s": 8.127477169036865,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 0,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 3928,
+      "output_tokens": 1522,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 4720,
+      "latency_s": 12.165810108184814,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ablation",
+      "turn_idx": 1,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2772,
+      "output_tokens": 118,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3769,
+      "latency_s": 7.942708730697632,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 1,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 5456,
+      "output_tokens": 892,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 6118,
+      "latency_s": 7.609802961349487,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ablation",
+      "turn_idx": 2,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2772,
+      "output_tokens": 178,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3769,
+      "latency_s": 7.543408393859863,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 2,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 6389,
+      "output_tokens": 1245,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 7052,
+      "latency_s": 9.923291206359863,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ablation",
+      "turn_idx": 3,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2772,
+      "output_tokens": 209,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3769,
+      "latency_s": 7.850194454193115,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 3,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 7681,
+      "output_tokens": 1084,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 8264,
+      "latency_s": 9.98221731185913,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ablation",
+      "turn_idx": 4,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2772,
+      "output_tokens": 135,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3769,
+      "latency_s": 9.596090078353882,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 4,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 8683,
+      "output_tokens": 3,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 1932,
+      "estimated_input_tokens": 9120,
+      "latency_s": 1.0883028507232666,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "costs": {
+    "num_code_executions": 5,
+    "coding_llm_calls": 6,
+    "coding_input_tokens": 34172,
+    "coding_output_tokens": 6409,
+    "vdm_calls": 6,
+    "vdm_input_tokens": 16046,
+    "vdm_output_tokens": 1007,
+    "vdm_gate_skips": 0,
+    "total_model_calls": 12,
+    "total_tokens": 57634,
+    "tool_calls": {
+      "get_observation": 4,
+      "segment_sam3_text_prompt": 8,
+      "segment_sam3_point_prompt": 0,
+      "point_prompt_molmo": 0,
+      "plan_grasp": 4,
+      "solve_ik": 28,
+      "move_to_joints": 28,
+      "open_gripper": 5,
+      "close_gripper": 4,
+      "get_oriented_bounding_box_from_3d_points": 8
+    },
+    "extra_perception_calls": 12,
+    "total_sim_steps": 1091,
+    "total_wall_time": 136.39036011695862,
+    "reset_wall_time": 0.6994292736053467
+  },
+  "evaluation": {
+    "official_task_success": true,
+    "official_reward": 1.0,
+    "episode_code_exec_success_rate": 0.8
+  }
+}

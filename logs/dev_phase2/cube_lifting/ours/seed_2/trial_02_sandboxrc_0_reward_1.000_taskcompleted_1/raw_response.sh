@@ -1,0 +1,48 @@
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasp_poses[best_idx]
+grasp_world = ext @ best_T
+
+pos = grasp_world[:3, 3]
+R = grasp_world[:3, :3]
+
+# approach from above: align gripper z-axis downward
+from scipy.spatial.transform import Rotation as Rot
+# build rotation with z pointing down (world -z), keep x from grasp
+z_axis = np.array([0, 0, -1.0])
+x_axis = R[:3, 0]
+x_axis = x_axis - np.dot(x_axis, z_axis) * z_axis
+x_axis /= np.linalg.norm(x_axis)
+y_axis = np.cross(z_axis, x_axis)
+R_down = np.column_stack([x_axis, y_axis, z_axis])
+quat = Rot.from_matrix(R_down).as_quat()  # xyzw
+quat_wxyz = np.array([quat[3], quat[0], quat[1], quat[2]])
+
+open_gripper()
+pre = pos.copy()
+pre[2] += 0.10
+joints = solve_ik(pre, quat_wxyz)
+move_to_joints(joints)
+
+joints = solve_ik(pos, quat_wxyz)
+move_to_joints(joints)
+
+close_gripper()
+
+lift = pos.copy()
+lift[2] += 0.15
+joints = solve_ik(lift, quat_wxyz)
+move_to_joints(joints)
+print("done", pos)

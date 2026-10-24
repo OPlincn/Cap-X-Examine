@@ -174,6 +174,10 @@ class EpisodeTelemetry:
         self.reset_wall_time: float | None = None
         # Filled by the VDM query helpers in capx.envs.trial; read back into the turn record.
         self.last_vdm: dict[str, Any] | None = None
+        # Optional ``() -> dict`` reading robot proprioception, called right after gripper
+        # commands; readings are appended to ``tool_events`` (logged, used by EG-VDM).
+        self.post_gripper_hook: Callable[[], dict[str, Any] | None] | None = None
+        self.tool_events: list[dict[str, Any]] = []
         self._token = None
 
     # ------------------------------------------------------------------ #
@@ -314,7 +318,14 @@ class EpisodeTelemetry:
             if name in MOTION_TOOLS:
                 self.check_sim_steps()
             self.tool_calls[name] += 1
-            return fn(*a, **kw)
+            result = fn(*a, **kw)
+            if name in ("open_gripper", "close_gripper") and self.post_gripper_hook is not None:
+                reading = self.post_gripper_hook()
+                if reading is not None:
+                    self.tool_events.append(
+                        {"turn_idx": self.num_code_executions, "call": name, **reading}
+                    )
+            return result
 
         return wrapper
 
@@ -374,6 +385,7 @@ class EpisodeTelemetry:
                 "vdm_calls": sum(1 for c in calls if c["role"] == "vdm"),
                 "vdm_input_tokens": self._sum("vdm", "input_tokens"),
                 "vdm_output_tokens": self._sum("vdm", "output_tokens"),
+                "vdm_gate_skips": sum(1 for t in self.turns if t.get("vdm_skipped_by_gate")),
                 "total_model_calls": len(calls),
                 "total_tokens": self.total_tokens,
                 "tool_calls": {t: self.tool_calls.get(t, 0) for t in COUNTED_TOOLS},
