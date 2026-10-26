@@ -1,0 +1,14 @@
+I'll start by getting an observation to understand the scene, then segment the cubes to locate them.
+
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+red_masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+green_masks = segment_sam3_text_prompt(rgb, text_prompt="green cube")
+print("red", [(m["score"], m["box"]) for m in red_masks])
+print("green", [(m["score"], m["box"]) for m in green_masks])

@@ -1,0 +1,134 @@
+# Code block 0
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(grasp_scores.argmax())
+best_T = grasp_poses[best_idx]
+grasp_world = ext @ best_T
+
+# Compute object center in world frame from mask points
+ys, xs = np.where(mask)
+z = depth[ys, xs]
+fx, fy = K[0,0], K[1,1]
+cx, cy = K[0,2], K[1,2]
+X = (xs - cx) * z / fx
+Y = (ys - cy) * z / fy
+pts_cam = np.stack([X, Y, z], axis=1)
+pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0],1))], axis=1)
+pts_world = (ext @ pts_cam_h.T).T[:, :3]
+center = pts_world.mean(axis=0)
+print("center", center)
+
+# Approach from above
+target_pos = center + np.array([0,0,0.15])
+quat = np.array([0.0, 1.0, 0.0, 0.0])  # wxyz, gripper pointing down
+open_gripper()
+joints = solve_ik(target_pos, quat)
+move_to_joints(joints)
+
+# Move down to grasp
+target_pos2 = center + np.array([0,0,0.02])
+joints2 = solve_ik(target_pos2, quat)
+move_to_joints(joints2)
+close_gripper()
+
+# Lift
+target_pos3 = center + np.array([0,0,0.2])
+joints3 = solve_ik(target_pos3, quat)
+move_to_joints(joints3)
+print("done")
+
+# Code block 1
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+# Compute object center in world frame from mask points
+ys, xs = np.where(mask)
+z = depth[ys, xs]
+fx, fy = K[0,0], K[1,1]
+cx, cy = K[0,2], K[1,2]
+X = (xs - cx) * z / fx
+Y = (ys - cy) * z / fy
+pts_cam = np.stack([X, Y, z], axis=1)
+pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0],1))], axis=1)
+pts_world = (ext @ pts_cam_h.T).T[:, :3]
+center = pts_world.mean(axis=0)
+print("center", center)
+
+# Use grasp pose from planner, transformed to world
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(grasp_scores.argmax())
+best_T = grasp_poses[best_idx]
+grasp_world = ext @ best_T
+grasp_pos = grasp_world[:3, 3]
+print("grasp_pos", grasp_pos)
+
+# Extract orientation from grasp pose (camera frame -> world)
+R_world = grasp_world[:3, :3]
+# Convert rotation matrix to quaternion (wxyz)
+def rot_to_quat(R):
+    tr = np.trace(R)
+    if tr > 0:
+        S = np.sqrt(tr + 1.0) * 2
+        w = 0.25 * S
+        x = (R[2,1] - R[1,2]) / S
+        y = (R[0,2] - R[2,0]) / S
+        z = (R[1,0] - R[0,1]) / S
+    elif (R[0,0] > R[1,1]) and (R[0,0] > R[2,2]):
+        S = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+        w = (R[2,1] - R[1,2]) / S
+        x = 0.25 * S
+        y = (R[0,1] + R[1,0]) / S
+        z = (R[0,2] + R[2,0]) / S
+    elif R[1,1] > R[2,2]:
+        S = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+        w = (R[0,2] - R[2,0]) / S
+        x = (R[0,1] + R[1,0]) / S
+        y = 0.25 * S
+        z = (R[1,2] + R[2,1]) / S
+    else:
+        S = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+        w = (R[1,0] - R[0,1]) / S
+        x = (R[0,2] + R[2,0]) / S
+        y = (R[1,2] + R[2,1]) / S
+        z = 0.25 * S
+    return np.array([w, x, y, z])
+
+quat = rot_to_quat(R_world)
+print("quat", quat)
+
+# Approach from above the grasp position
+approach_pos = grasp_pos + np.array([0, 0, 0.12])
+open_gripper()
+joints = solve_ik(approach_pos, quat)
+move_to_joints(joints)
+
+# Move down to grasp position
+joints2 = solve_ik(grasp_pos, quat)
+move_to_joints(joints2)
+close_gripper()
+
+# Lift
+lift_pos = grasp_pos + np.array([0, 0, 0.2])
+joints3 = solve_ik(lift_pos, quat)
+move_to_joints(joints3)
+print("done")

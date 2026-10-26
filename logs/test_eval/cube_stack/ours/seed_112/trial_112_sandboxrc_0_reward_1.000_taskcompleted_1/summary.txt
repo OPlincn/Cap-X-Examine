@@ -1,0 +1,101 @@
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+def get_center_world(text_prompt):
+    res = segment_sam3_text_prompt(rgb, text_prompt=text_prompt)
+    best = max(res, key=lambda d: d["score"])
+    mask = best["mask"]
+    ys, xs = np.nonzero(mask)
+    zs = depth[ys, xs]
+    valid = zs > 0
+    xs, ys, zs = xs[valid], ys[valid], zs[valid]
+    pts_cam = np.stack([
+        (xs - K[0,2]) * zs / K[0,0],
+        (ys - K[1,2]) * zs / K[1,1],
+        zs
+    ], axis=1)
+    pts_world = (ext[:3,:3] @ pts_cam.T).T + ext[:3,3]
+    return pts_world, mask
+
+red_pts, red_mask = get_center_world("red cube")
+green_pts, green_mask = get_center_world("green cube")
+
+red_obb = get_oriented_bounding_box_from_3d_points(red_pts)
+green_obb = get_oriented_bounding_box_from_3d_points(green_pts)
+
+red_center = red_obb["center"]
+green_center = green_obb["center"]
+green_extent = green_obb["extent"]
+red_extent = red_obb["extent"]
+
+# Grasp red cube from above
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_mask.astype(np.int32))
+best_idx = grasp_scores.argmax()
+best_T = grasp_poses[best_idx]
+grasp_world = ext @ best_T
+
+# Approach: move above red cube, then down to grasp
+above_red = red_center.copy()
+above_red[2] = red_center[2] + 0.15
+
+# Use identity-ish downward orientation
+quat_down = np.array([0.0, 1.0, 0.0, 0.0])  # wxyz, gripper pointing down
+
+joints = solve_ik(above_red, quat_down)
+move_to_joints(joints)
+
+# Move to grasp position
+grasp_pos = red_center.copy()
+grasp_pos[2] = red_center[2] + 0.005
+joints = solve_ik(grasp_pos, quat_down)
+move_to_joints(joints)
+
+close_gripper()
+
+# Lift red cube
+lift_pos = grasp_pos.copy()
+lift_pos[2] += 0.15
+joints = solve_ik(lift_pos, quat_down)
+move_to_joints(joints)
+
+# Move above green cube
+above_green = green_center.copy()
+above_green[2] = green_center[2] + 0.15
+joints = solve_ik(above_green, quat_down)
+move_to_joints(joints)
+
+# Place red cube on top of green cube
+place_pos = green_center.copy()
+place_pos[2] = green_center[2] + green_extent[2]/2 + red_extent[2]/2 + 0.005
+joints = solve_ik(place_pos, quat_down)
+move_to_joints(joints)
+
+open_gripper()
+
+# Retreat
+retreat_pos = place_pos.copy()
+retreat_pos[2] += 0.15
+joints = solve_ik(retreat_pos, quat_down)
+move_to_joints(joints)
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: 
+  Stderr: 
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 0
+  Num Finishes: 1
+  Num Code Blocks: 1
+----------------------------------------------------------------------------------------------------

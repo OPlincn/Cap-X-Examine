@@ -1,0 +1,53 @@
+# Code block 0
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasp_poses[best_idx]
+grasp_world = ext @ best_T
+
+# compute cube center in world from mask points
+ys, xs = np.where(mask)
+z = depth[ys, xs]
+fx, fy = K[0,0], K[1,1]
+cx, cy = K[0,2], K[1,2]
+X = (xs - cx) * z / fx
+Y = (ys - cy) * z / fy
+pts_cam = np.stack([X, Y, z, np.ones_like(z)], axis=1)
+pts_world = (ext @ pts_cam.T).T[:, :3]
+center = pts_world.mean(axis=0)
+print("cube center world:", center)
+print("grasp world pos:", grasp_world[:3,3])
+print("grasp score:", grasp_scores[best_idx])
+
+# approach from above
+target_pos = grasp_world[:3,3].copy()
+target_pos[2] = center[2] + 0.10
+quat = np.array([0.0, 1.0, 0.0, 0.0])  # gripper pointing down
+open_gripper()
+joints = solve_ik(target_pos, quat)
+move_to_joints(joints)
+
+# descend to grasp
+target_pos[2] = center[2] + 0.005
+joints = solve_ik(target_pos, quat)
+move_to_joints(joints)
+
+close_gripper()
+
+# lift
+lift_pos = target_pos.copy()
+lift_pos[2] += 0.15
+joints = solve_ik(lift_pos, quat)
+move_to_joints(joints)
+print("done")

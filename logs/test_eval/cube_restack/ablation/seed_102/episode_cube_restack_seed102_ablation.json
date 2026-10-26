@@ -1,0 +1,995 @@
+{
+  "task_name": "cube_restack",
+  "seed": 102,
+  "mode": "ablation",
+  "initial_state": {
+    "seed": 102,
+    "qpos_sha256_16": "da28394fa830e3cd",
+    "qpos": [
+      0.012514,
+      0.262902,
+      0.019107,
+      -2.649105,
+      -0.011874,
+      2.963229,
+      -2.357073,
+      0.008382,
+      -0.008395,
+      0.038122,
+      0.118366,
+      0.818507,
+      0.723523,
+      -0.000792,
+      -0.00083,
+      0.6903,
+      0.028018,
+      0.118367,
+      0.854965,
+      0.941626,
+      -0.000543,
+      -0.001421,
+      0.336657
+    ]
+  },
+  "coding_model": "deepseek-v4.1-flash-1017",
+  "vdm_model": "qwen3.8-flash",
+  "budget": {
+    "max_turns": 8,
+    "max_model_calls": 16,
+    "max_total_tokens": 60000,
+    "max_sim_steps": 1500,
+    "max_wall_time_s": 600,
+    "max_completion_tokens": 8192
+  },
+  "termination_reason": "max_total_tokens",
+  "termination_detail": "used 49093, next call needs ~22788+256",
+  "timeout_or_budget_exceeded": true,
+  "budget_exceeded": "max_total_tokens",
+  "turns": [
+    {
+      "turn_idx": 0,
+      "generated_code": "import numpy as np\n\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\n# Segment the red and green cubes\nred_res = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\ngreen_res = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\n\nred_best = max(red_res, key=lambda d: d[\"score\"])\ngreen_best = max(green_res, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\ngreen_mask = green_best[\"mask\"]\n\nprint(\"red box\", red_best[\"box\"], \"score\", red_best[\"score\"])\nprint(\"green box\", green_best[\"box\"], \"score\", green_best[\"score\"])\n```\n\nNow I'll compute 3D positions of both cubes from the depth image to know where they are in the world.\n\n```python\ndef mask_to_world_points(mask, depth, K, cam_ext):\n    ys, xs = np.where(mask)\n    zs = depth[ys, xs]\n    valid = zs > 0\n    xs, ys, zs = xs[valid], ys[valid], zs[valid]\n    fx, fy = K[0, 0], K[1, 1]\n    cx, cy = K[0, 2], K[1, 2]\n    xc = (xs - cx) * zs / fx\n    yc = (ys - cy) * zs / fy\n    pts_cam = np.stack([xc, yc, zs], axis=1)\n    pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)\n    pts_world = (cam_ext @ pts_cam_h.T).T[:, :3]\n    return pts_world\n\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\n\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\n\nred_center = red_obb[\"center\"]\ngreen_center = green_obb[\"center\"]\nred_extent = red_obb[\"extent\"]\ngreen_extent = green_obb[\"extent\"]\nprint(\"red center\", red_center, \"extent\", red_extent)\nprint(\"green center\", green_center, \"extent\", green_extent)\n```\n\nNow I'll plan a grasp on the red cube. Since the red cube is beneath the green cube, I need to grasp it from the side. Let me plan grasps and pick one that approaches from the side.\n\n```python\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_mask.astype(np.int32))\nprint(\"num grasps\", len(grasp_scores))\n\n# Transform grasps to world frame\ngrasps_world = np.array([cam_ext @ T for T in grasp_poses])\n\n# Choose a grasp approaching from the side (gripper z-axis roughly horizontal)\nbest_idx = None\nbest_score = -1\nfor i, T in enumerate(grasps_world):\n    approach = T[:3, 2]  # gripper z axis\n    # prefer horizontal approach (small vertical component)\n    if abs(approach[2]) < 0.5:\n        if grasp_scores[i] > best_score:\n            best_score = grasp_scores[i]\n            best_idx = i\n\nif best_idx is None:\n    best_idx = int(np.argmax(grasp_scores))\n\nbest_T = grasps_world[best_idx]\nprint(\"chosen grasp score\", grasp_scores[best_idx])\nprint(\"approach\", best_T[:3, 2])\nprint(\"pos\", best_T[:3, 3])\n```\n\nNow I'll execute the grasp: move to a pre-grasp pose, approach, close gripper, lift.\n\n```python\nfrom scipy.spatial.transform import Rotation as R\n\ndef mat_to_quat_wxyz(T):\n    rot = R.from_matrix(T[:3, :3])\n    q = rot.as_quat()  # xyzw\n    return np.array([q[3], q[0], q[1], q[2]])\n\ngrasp_pos = best_T[:3, 3]\ngrasp_quat = mat_to_quat_wxyz(best_T)\napproach_dir = best_T[:3, 2]\n\n# Pre-grasp: back off along approach axis\npre_pos = grasp_pos - approach_dir * 0.08\njoints = solve_ik(pre_pos, grasp_quat)\nmove_to_joints(joints)\n\n# Move to grasp\njoints = solve_ik(grasp_pos, grasp_quat)\nmove_to_joints(joints)\n\nclose_gripper()\n\n# Lift straight up\nlift_pos = grasp_pos + np.array([0, 0, 0.15])\njoints = solve_ik(lift_pos, grasp_quat)\nmove_to_joints(joints)\n```\n\nNow I'll move the red cube over the green cube and place it on top. The green cube's top is at green_center[2] + green_extent[2]/2. The red cube's center should be placed so its bottom rests on the green top.\n\n```python\n# Target: red cube center above green cube center\nred_half_height = red_extent[2] / 2.0\ngreen_top = green_center[2] + green_extent[2] / 2.0\ntarget_red_center = np.array([green_center[0], green_center[1], green_top + red_half_height])\n\n# The grasp offset: grasp_pos relative to red_center\noffset = grasp_pos - red_center\n# Keep same orientation, so target grasp pos = target_red_center + offset\ntarget_grasp_pos = target_red_center + offset\n\n# Move above target first\nabove_pos = target_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(above_pos, grasp_quat)\nmove_to_joints(joints)\n\n# Lower to place\njoints = solve_ik(target_grasp_pos, grasp_quat)\nmove_to_joints(joints)\n\nopen_gripper()\n\n# Retreat upward\nretreat_pos = target_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(retreat_pos, grasp_quat)\nmove_to_joints(joints)\n```\n\nLet me verify the result with a new observation.\n\n```python\nobs2 = get_observation()\nrgb2 = obs2[\"robot0_robotview\"][\"images\"][\"rgb\"]\nred_res2 = segment_sam3_text_prompt(rgb2, text_prompt=\"red cube\")\ngreen_res2 = segment_sam3_text_prompt(rgb2, text_prompt=\"green cube\")\nprint(\"red boxes\", [r[\"box\"] for r in red_res2])\nprint(\"green boxes\", [r[\"box\"] for r in green_res2])",
+      "generated_by_call": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py\", line 196, in _exec_user_code\n    exec(code, self._exec_globals, self._exec_globals)\n  File \"<string>\", line 23\n    Now I'll compute 3D positions of both cubes from the depth image to know where they are in the world.\n         ^\nSyntaxError: unterminated string literal (detected at line 23)\n",
+      "code_exec_success": false,
+      "exec_wall_time": 0.02430438995361328,
+      "sim_steps_delta": 0,
+      "tool_calls_delta": {},
+      "exec_record": {
+        "exec_ok": false,
+        "exception": "SyntaxError: unterminated string literal (detected at line 23)",
+        "error_line": 23,
+        "tool_calls": {},
+        "motion_calls": {
+          "move_to_joints": 0,
+          "open_gripper": 0,
+          "close_gripper": 0
+        },
+        "num_motion_calls": 0,
+        "sim_steps_delta": 0,
+        "proprio_before": {
+          "eef_xyz": [
+            0.4224,
+            0.0147,
+            0.1602
+          ],
+          "gripper_opening": 0.21
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.4224,
+            0.0147,
+            0.1602
+          ],
+          "gripper_opening": 0.21
+        },
+        "gripper_events": []
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.4224,
+          0.0147,
+          0.1602
+        ],
+        "gripper_opening": 0.21
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.4224,
+          0.0147,
+          0.1602
+        ],
+        "gripper_opening": 0.21
+      },
+      "turn_eval_success": false,
+      "turn_eval_reward": 0.0015635653608241235,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_00.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_01.png"
+            },
+            {
+              "type": "text",
+              "text": "Generic verification checklist (apply before giving a verdict):\n1. Look at both images carefully and list every object that is relevant to the goal.\n2. A single 2D camera view can be misleading about height, depth and contact; objects that appear to overlap may be far apart, and an object near the gripper may or may not be held.\n3. Check the stacking order and vertical relation of the objects explicitly instead of assuming it from their screen positions.\n4. Check whether the gripper fingers are open or closed and whether an object is between them.\n5. Check whether the robot arm occludes any object that matters for the goal.\n6. Do not assume an action happened just because it would be the next logical step; describe only what is visible.\n7. If the evidence is ambiguous, prefer UNCERTAIN over guessing COMPLETE or NOT COMPLETE.\n8. Base the verdict only on what the two images show, and state the concrete visual evidence."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: none\nGripper & Occlusion Check: The gripper is open and empty. The red cube is resting on the table, and the green cube is stacked directly on top of the red cube. No objects are occluded by the arm.\nVerdict: NOT COMPLETE \u2014 The goal requires the red cube to be placed on top of the green cube, but the current state shows the green cube on top of the red cube (or unchanged from a previous incorrect state).",
+      "vdm_call_index": 2,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "NOT COMPLETE",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Generic Verification Checklist]\n- The assessment below was produced by a visual verification module that compared the previous and current camera images.\n- A single 2D view can be ambiguous about height, contact and stacking order.\n- Check the gripper state and object relations before deciding on the next action.\n- Prefer verifying with perception over assuming the outcome of an action.\n[Visual Differencing Assessment]\nPhysical Change: none\nGripper & Occlusion Check: The gripper is open and empty. The red cube is resting on the table, and the green cube is stacked directly on top of the red cube. No objects are occluded by the arm.\nVerdict: NOT COMPLETE \u2014 The goal requires the red cube to be placed on top of the green cube, but the current state shows the green cube on top of the red cube (or unchanged from a previous incorrect state).",
+      "decision_after": "regenerate",
+      "decision_call_index": 3,
+      "initial_scene_vdm": {
+        "purpose": "vdm_initial",
+        "vdm_prompt": [
+          {
+            "role": "system",
+            "content": "You are a helpful assistant that describes the initial state of the environment with the goal of the task in mind. You should try to provide objective information and no assumptions. Do *NOT* write any code."
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+              },
+              {
+                "type": "text",
+                "text": "Describe the initial state of the environment with the goal of the task in mind. You should try to provide objective information and no assumptions. Do *NOT* write any code."
+              },
+              {
+                "type": "text",
+                "text": "Main camera view:"
+              },
+              {
+                "type": "image",
+                "file": "visual_feedback_00.png"
+              }
+            ]
+          }
+        ],
+        "vdm_output": "The environment shows a Franka Emika robot arm with its gripper positioned above the workspace. The camera view is from the robot's perspective, looking down at a white surface.\n\nOn the right side of the image, there are two cubes:\n- A green cube resting on top of a red cube.\n- The red cube is directly beneath the green cube.\n\nThe goal is to place the red cube on top of the green cube and then open the gripper. Currently, the arrangement is reversed (green on top of red). The robot needs to grasp the red cube, lift it off the green cube, move it over the green cube, lower it onto the green cube, and finally release the gripper.",
+        "vdm_call_index": 0
+      },
+      "decision_raw_response": null,
+      "turn_wall_time": 24.870906591415405
+    },
+    {
+      "turn_idx": 1,
+      "generated_code": "import numpy as np\nfrom scipy.spatial.transform import Rotation as R\n\ndef mask_to_world_points(mask, depth, K, cam_ext):\n    ys, xs = np.where(mask)\n    zs = depth[ys, xs]\n    valid = zs > 0\n    xs, ys, zs = xs[valid], ys[valid], zs[valid]\n    fx, fy = K[0, 0], K[1, 1]\n    cx, cy = K[0, 2], K[1, 2]\n    xc = (xs - cx) * zs / fx\n    yc = (ys - cy) * zs / fy\n    pts_cam = np.stack([xc, yc, zs], axis=1)\n    pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)\n    pts_world = (cam_ext @ pts_cam_h.T).T[:, :3]\n    return pts_world\n\ndef mat_to_quat_wxyz(T):\n    rot = R.from_matrix(T[:3, :3])\n    q = rot.as_quat()\n    return np.array([q[3], q[0], q[1], q[2]])\n\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\nred_res = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\ngreen_res = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\nred_best = max(red_res, key=lambda d: d[\"score\"])\ngreen_best = max(green_res, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\ngreen_mask = green_best[\"mask\"]\n\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\nred_center = red_obb[\"center\"]\ngreen_center = green_obb[\"center\"]\nred_extent = red_obb[\"extent\"]\ngreen_extent = green_obb[\"extent\"]\n\n# The red cube is currently on the table (bottom), green is on top of it.\n# We need to grasp the RED cube and place it on top of the GREEN cube.\n# But green is on top of red, so we must first move green aside, or grasp red from the side.\n# Simplest: grasp green, lift it, set it down elsewhere; then grasp red, place on green.\n# Actually goal: red on top of green. So we need green on the table and red on top.\n\n# Step 1: grasp the green cube (currently on top) and move it to the side.\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=green_mask.astype(np.int32))\ngrasps_world = np.array([cam_ext @ T for T in grasp_poses])\nbest_idx = int(np.argmax(grasp_scores))\nbest_T = grasps_world[best_idx]\ngrasp_pos = best_T[:3, 3]\ngrasp_quat = mat_to_quat_wxyz(best_T)\napproach_dir = best_T[:3, 2]\n\npre_pos = grasp_pos - approach_dir * 0.08\njoints = solve_ik(pre_pos, grasp_quat)\nmove_to_joints(joints)\njoints = solve_ik(grasp_pos, grasp_quat)\nmove_to_joints(joints)\nclose_gripper()\n\nlift_pos = grasp_pos + np.array([0, 0, 0.15])\njoints = solve_ik(lift_pos, grasp_quat)\nmove_to_joints(joints)\n\n# Move green to a side location (offset in x)\nside_target = np.array([green_center[0] + 0.15, green_center[1], green_center[2]])\noffset = grasp_pos - green_center\nside_grasp_pos = side_target + offset\nabove_side = side_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(above_side, grasp_quat)\nmove_to_joints(joints)\njoints = solve_ik(side_grasp_pos, grasp_quat)\nmove_to_joints(joints)\nopen_gripper()\nretreat = side_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(retreat, grasp_quat)\nmove_to_joints(joints)\n\n# Step 2: re-observe to get updated positions\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\nred_res = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\ngreen_res = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\nred_best = max(red_res, key=lambda d: d[\"score\"])\ngreen_best = max(green_res, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\ngreen_mask = green_best[\"mask\"]\n\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\nred_center = red_obb[\"center\"]\ngreen_center = green_obb[\"center\"]\nred_extent = red_obb[\"extent\"]\ngreen_extent = green_obb[\"extent\"]\n\n# Step 3: grasp red cube and place on top of green cube\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_mask.astype(np.int32))\ngrasps_world = np.array([cam_ext @ T for T in grasp_poses])\nbest_idx = int(np.argmax(grasp_scores))\nbest_T = grasps_world[best_idx]\ngrasp_pos = best_T[:3, 3]\ngrasp_quat = mat_to_quat_wxyz(best_T)\napproach_dir = best_T[:3, 2]\n\npre_pos = grasp_pos - approach_dir * 0.08\njoints = solve_ik(pre_pos, grasp_quat)\nmove_to_joints(joints)\njoints = solve_ik(grasp_pos, grasp_quat)\nmove_to_joints(joints)\nclose_gripper()\n\nlift_pos = grasp_pos + np.array([0, 0, 0.15])\njoints = solve_ik(lift_pos, grasp_quat)\nmove_to_joints(joints)\n\n# Target: red cube center above green cube center\nred_half_height = red_extent[2] / 2.0\ngreen_top = green_center[2] + green_extent[2] / 2.0\ntarget_red_center = np.array([green_center[0], green_center[1], green_top + red_half_height])\noffset = grasp_pos - red_center\ntarget_grasp_pos = target_red_center + offset\n\nabove_pos = target_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(above_pos, grasp_quat)\nmove_to_joints(joints)\njoints = solve_ik(target_grasp_pos, grasp_quat)\nmove_to_joints(joints)\nopen_gripper()\nretreat_pos = target_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(retreat_pos, grasp_quat)\nmove_to_joints(joints)",
+      "generated_by_call": 3,
+      "stdout": "",
+      "stderr": "",
+      "code_exec_success": true,
+      "exec_wall_time": 14.424269199371338,
+      "sim_steps_delta": 465,
+      "tool_calls_delta": {
+        "get_observation": 2,
+        "segment_sam3_text_prompt": 4,
+        "get_oriented_bounding_box_from_3d_points": 4,
+        "plan_grasp": 2,
+        "solve_ik": 12,
+        "move_to_joints": 12,
+        "close_gripper": 2,
+        "open_gripper": 2
+      },
+      "exec_record": {
+        "exec_ok": true,
+        "exception": null,
+        "error_line": null,
+        "tool_calls": {
+          "get_observation": 2,
+          "segment_sam3_text_prompt": 4,
+          "get_oriented_bounding_box_from_3d_points": 4,
+          "plan_grasp": 2,
+          "solve_ik": 12,
+          "move_to_joints": 12,
+          "close_gripper": 2,
+          "open_gripper": 2
+        },
+        "motion_calls": {
+          "move_to_joints": 12,
+          "open_gripper": 2,
+          "close_gripper": 2
+        },
+        "num_motion_calls": 16,
+        "sim_steps_delta": 465,
+        "proprio_before": {
+          "eef_xyz": [
+            0.4224,
+            0.0147,
+            0.1602
+          ],
+          "gripper_opening": 0.21
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.7497,
+            0.1755,
+            0.1236
+          ],
+          "gripper_opening": 1.0
+        },
+        "gripper_events": [
+          {
+            "turn_idx": 1,
+            "call": "close_gripper",
+            "eef_xyz": [
+              0.5322,
+              0.0794,
+              0.0068
+            ],
+            "gripper_opening": 0.727
+          },
+          {
+            "turn_idx": 1,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.6787,
+              0.0802,
+              0.0054
+            ],
+            "gripper_opening": 0.97
+          },
+          {
+            "turn_idx": 1,
+            "call": "close_gripper",
+            "eef_xyz": [
+              0.6303,
+              0.1923,
+              -0.0095
+            ],
+            "gripper_opening": -0.012
+          },
+          {
+            "turn_idx": 1,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.7476,
+              0.1744,
+              0.0131
+            ],
+            "gripper_opening": 1.014
+          }
+        ]
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.4224,
+          0.0147,
+          0.1602
+        ],
+        "gripper_opening": 0.21
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.7497,
+          0.1755,
+          0.1236
+        ],
+        "gripper_opening": 1.0
+      },
+      "turn_eval_success": false,
+      "turn_eval_reward": 0.0025199284925535304,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_01.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_02.png"
+            },
+            {
+              "type": "text",
+              "text": "Generic verification checklist (apply before giving a verdict):\n1. Look at both images carefully and list every object that is relevant to the goal.\n2. A single 2D camera view can be misleading about height, depth and contact; objects that appear to overlap may be far apart, and an object near the gripper may or may not be held.\n3. Check the stacking order and vertical relation of the objects explicitly instead of assuming it from their screen positions.\n4. Check whether the gripper fingers are open or closed and whether an object is between them.\n5. Check whether the robot arm occludes any object that matters for the goal.\n6. Do not assume an action happened just because it would be the next logical step; describe only what is visible.\n7. If the evidence is ambiguous, prefer UNCERTAIN over guessing COMPLETE or NOT COMPLETE.\n8. Base the verdict only on what the two images show, and state the concrete visual evidence."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: The robot arm has moved significantly to the right and downwards. In the previous image, a green cube was resting on top of a red cube. In the current image, the green cube is visible on the table surface, but the red cube is no longer clearly visible in that location; instead, there appears to be a reddish object held within or obscured by the gripper fingers on the right side of the frame.\n\nGripper & Occlusion Check: The gripper is located on the far right edge of the image. It appears to be holding an object (likely the red cube based on color visibility), which obscures the view of what is underneath it. The green cube is now sitting alone on the table. The goal requires the red cube to be *on top* of the green cube. Currently, the red cube is being held by the gripper, not stacked on the green cube.\n\nVerdict: NOT COMPLETE \u2014 The red cube is currently held by the gripper and is not placed on top of the green cube as required by the goal.",
+      "vdm_call_index": 4,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "NOT COMPLETE",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Generic Verification Checklist]\n- The assessment below was produced by a visual verification module that compared the previous and current camera images.\n- A single 2D view can be ambiguous about height, contact and stacking order.\n- Check the gripper state and object relations before deciding on the next action.\n- Prefer verifying with perception over assuming the outcome of an action.\n[Visual Differencing Assessment]\nPhysical Change: The robot arm has moved significantly to the right and downwards. In the previous image, a green cube was resting on top of a red cube. In the current image, the green cube is visible on the table surface, but the red cube is no longer clearly visible in that location; instead, there appears to be a reddish object held within or obscured by the gripper fingers on the right side of the frame.\n\nGripper & Occlusion Check: The gripper is located on the far right edge of the image. It appears to be holding an object (likely the red cube based on color visibility), which obscures the view of what is underneath it. The green cube is now sitting alone on the table. The goal requires the red cube to be *on top* of the green cube. Currently, the red cube is being held by the gripper, not stacked on the green cube.\n\nVerdict: NOT COMPLETE \u2014 The red cube is currently held by the gripper and is not placed on top of the green cube as required by the goal.",
+      "decision_after": "regenerate",
+      "decision_call_index": 5,
+      "decision_raw_response": null,
+      "turn_wall_time": 36.35131025314331
+    },
+    {
+      "turn_idx": 2,
+      "generated_code": "import numpy as np\nfrom scipy.spatial.transform import Rotation as R\n\ndef mask_to_world_points(mask, depth, K, cam_ext):\n    ys, xs = np.where(mask)\n    zs = depth[ys, xs]\n    valid = zs > 0\n    xs, ys, zs = xs[valid], ys[valid], zs[valid]\n    fx, fy = K[0, 0], K[1, 1]\n    cx, cy = K[0, 2], K[1, 2]\n    xc = (xs - cx) * zs / fx\n    yc = (ys - cy) * zs / fy\n    pts_cam = np.stack([xc, yc, zs], axis=1)\n    pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)\n    pts_world = (cam_ext @ pts_cam_h.T).T[:, :3]\n    return pts_world\n\ndef mat_to_quat_wxyz(T):\n    rot = R.from_matrix(T[:3, :3])\n    q = rot.as_quat()\n    return np.array([q[3], q[0], q[1], q[2]])\n\n# Re-observe: red cube is currently held in gripper, green cube is on table.\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\ngreen_res = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\ngreen_best = max(green_res, key=lambda d: d[\"score\"])\ngreen_mask = green_best[\"mask\"]\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\ngreen_center = green_obb[\"center\"]\ngreen_extent = green_obb[\"extent\"]\n\n# Red cube is in the gripper. We need to know where the gripper currently is.\n# Use forward kinematics via solve_ik is not available; instead use the red mask to locate it.\nred_res = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\nred_best = max(red_res, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\nred_center = red_obb[\"center\"]\nred_extent = red_obb[\"extent\"]\n\n# Current gripper orientation: keep the same orientation used to grasp.\n# We'll re-plan a grasp pose on the red cube to recover the grasp transform.\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_mask.astype(np.int32))\ngrasps_world = np.array([cam_ext @ T for T in grasp_poses])\nbest_idx = int(np.argmax(grasp_scores))\nbest_T = grasps_world[best_idx]\ngrasp_quat = mat_to_quat_wxyz(best_T)\ngrasp_pos = best_T[:3, 3]\noffset = grasp_pos - red_center\n\n# Compute target placement: red cube on top of green cube\nred_half_height = red_extent[2] / 2.0\ngreen_top = green_center[2] + green_extent[2] / 2.0\ntarget_red_center = np.array([green_center[0], green_center[1], green_top + red_half_height])\ntarget_grasp_pos = target_red_center + offset\n\n# Move above target, then lower to place\nabove_pos = target_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(above_pos, grasp_quat)\nmove_to_joints(joints)\njoints = solve_ik(target_grasp_pos, grasp_quat)\nmove_to_joints(joints)\nopen_gripper()\nretreat_pos = target_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(retreat_pos, grasp_quat)\nmove_to_joints(joints)",
+      "generated_by_call": 5,
+      "stdout": "",
+      "stderr": "",
+      "code_exec_success": true,
+      "exec_wall_time": 5.063649892807007,
+      "sim_steps_delta": 89,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 2,
+        "get_oriented_bounding_box_from_3d_points": 2,
+        "plan_grasp": 1,
+        "solve_ik": 3,
+        "move_to_joints": 3,
+        "open_gripper": 1
+      },
+      "exec_record": {
+        "exec_ok": true,
+        "exception": null,
+        "error_line": null,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 2,
+          "get_oriented_bounding_box_from_3d_points": 2,
+          "plan_grasp": 1,
+          "solve_ik": 3,
+          "move_to_joints": 3,
+          "open_gripper": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 3,
+          "open_gripper": 1,
+          "close_gripper": 0
+        },
+        "num_motion_calls": 4,
+        "sim_steps_delta": 89,
+        "proprio_before": {
+          "eef_xyz": [
+            0.7497,
+            0.1755,
+            0.1236
+          ],
+          "gripper_opening": 1.0
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.7162,
+            0.1349,
+            0.1323
+          ],
+          "gripper_opening": 0.99
+        },
+        "gripper_events": [
+          {
+            "turn_idx": 2,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.7156,
+              0.1347,
+              0.0176
+            ],
+            "gripper_opening": 0.991
+          }
+        ]
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.7497,
+          0.1755,
+          0.1236
+        ],
+        "gripper_opening": 1.0
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.7162,
+          0.1349,
+          0.1323
+        ],
+        "gripper_opening": 0.99
+      },
+      "turn_eval_success": false,
+      "turn_eval_reward": 0.0027510709691360435,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_02.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_03.png"
+            },
+            {
+              "type": "text",
+              "text": "Generic verification checklist (apply before giving a verdict):\n1. Look at both images carefully and list every object that is relevant to the goal.\n2. A single 2D camera view can be misleading about height, depth and contact; objects that appear to overlap may be far apart, and an object near the gripper may or may not be held.\n3. Check the stacking order and vertical relation of the objects explicitly instead of assuming it from their screen positions.\n4. Check whether the gripper fingers are open or closed and whether an object is between them.\n5. Check whether the robot arm occludes any object that matters for the goal.\n6. Do not assume an action happened just because it would be the next logical step; describe only what is visible.\n7. If the evidence is ambiguous, prefer UNCERTAIN over guessing COMPLETE or NOT COMPLETE.\n8. Base the verdict only on what the two images show, and state the concrete visual evidence."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: The robot arm has moved from the right side of the workspace towards the center, positioning itself above the green cube.\nGripper & Occlusion Check: The gripper is closed and appears to be holding a red object (the red cube). The green cube is visible on the table surface below the gripper. There is no stacking yet; the red cube is suspended in the air by the gripper, positioned near but not on top of the green cube.\nVerdict: NOT COMPLETE \u2014 The red cube is currently held by the gripper and has not been placed on top of the green cube.",
+      "vdm_call_index": 6,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "NOT COMPLETE",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Generic Verification Checklist]\n- The assessment below was produced by a visual verification module that compared the previous and current camera images.\n- A single 2D view can be ambiguous about height, contact and stacking order.\n- Check the gripper state and object relations before deciding on the next action.\n- Prefer verifying with perception over assuming the outcome of an action.\n[Visual Differencing Assessment]\nPhysical Change: The robot arm has moved from the right side of the workspace towards the center, positioning itself above the green cube.\nGripper & Occlusion Check: The gripper is closed and appears to be holding a red object (the red cube). The green cube is visible on the table surface below the gripper. There is no stacking yet; the red cube is suspended in the air by the gripper, positioned near but not on top of the green cube.\nVerdict: NOT COMPLETE \u2014 The red cube is currently held by the gripper and has not been placed on top of the green cube.",
+      "decision_after": "regenerate",
+      "decision_call_index": 7,
+      "decision_raw_response": null,
+      "turn_wall_time": 22.400949239730835
+    },
+    {
+      "turn_idx": 3,
+      "generated_code": "import numpy as np\nfrom scipy.spatial.transform import Rotation as R\n\ndef mask_to_world_points(mask, depth, K, cam_ext):\n    ys, xs = np.where(mask)\n    zs = depth[ys, xs]\n    valid = zs > 0\n    xs, ys, zs = xs[valid], ys[valid], zs[valid]\n    fx, fy = K[0, 0], K[1, 1]\n    cx, cy = K[0, 2], K[1, 2]\n    xc = (xs - cx) * zs / fx\n    yc = (ys - cy) * zs / fy\n    pts_cam = np.stack([xc, yc, zs], axis=1)\n    pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)\n    pts_world = (cam_ext @ pts_cam_h.T).T[:, :3]\n    return pts_world\n\ndef mat_to_quat_wxyz(T):\n    rot = R.from_matrix(T[:3, :3])\n    q = rot.as_quat()\n    return np.array([q[3], q[0], q[1], q[2]])\n\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\n# Locate green cube (on table) and red cube (held in gripper)\ngreen_res = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\ngreen_best = max(green_res, key=lambda d: d[\"score\"])\ngreen_mask = green_best[\"mask\"]\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\ngreen_center = green_obb[\"center\"]\ngreen_extent = green_obb[\"extent\"]\n\nred_res = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\nred_best = max(red_res, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\nred_center = red_obb[\"center\"]\nred_extent = red_obb[\"extent\"]\n\n# Recover grasp orientation from a planned grasp on the red cube\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_mask.astype(np.int32))\ngrasps_world = np.array([cam_ext @ T for T in grasp_poses])\nbest_idx = int(np.argmax(grasp_scores))\nbest_T = grasps_world[best_idx]\ngrasp_quat = mat_to_quat_wxyz(best_T)\ngrasp_pos = best_T[:3, 3]\noffset = grasp_pos - red_center\n\n# Target: red cube center directly above green cube center, resting on green top\nred_half_height = red_extent[2] / 2.0\ngreen_top = green_center[2] + green_extent[2] / 2.0\ntarget_red_center = np.array([green_center[0], green_center[1], green_top + red_half_height])\ntarget_grasp_pos = target_red_center + offset\n\n# Move above target, then lower to place\nabove_pos = target_grasp_pos + np.array([0, 0, 0.10])\njoints = solve_ik(above_pos, grasp_quat)\nmove_to_joints(joints)\njoints = solve_ik(target_grasp_pos, grasp_quat)\nmove_to_joints(joints)\nopen_gripper()\nretreat_pos = target_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(retreat_pos, grasp_quat)\nmove_to_joints(joints)",
+      "generated_by_call": 7,
+      "stdout": "",
+      "stderr": "",
+      "code_exec_success": true,
+      "exec_wall_time": 4.823225975036621,
+      "sim_steps_delta": 95,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 2,
+        "get_oriented_bounding_box_from_3d_points": 2,
+        "plan_grasp": 1,
+        "solve_ik": 3,
+        "move_to_joints": 3,
+        "open_gripper": 1
+      },
+      "exec_record": {
+        "exec_ok": true,
+        "exception": null,
+        "error_line": null,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 2,
+          "get_oriented_bounding_box_from_3d_points": 2,
+          "plan_grasp": 1,
+          "solve_ik": 3,
+          "move_to_joints": 3,
+          "open_gripper": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 3,
+          "open_gripper": 1,
+          "close_gripper": 0
+        },
+        "num_motion_calls": 4,
+        "sim_steps_delta": 95,
+        "proprio_before": {
+          "eef_xyz": [
+            0.7162,
+            0.1349,
+            0.1323
+          ],
+          "gripper_opening": 0.99
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.7606,
+            0.1312,
+            0.1413
+          ],
+          "gripper_opening": 0.995
+        },
+        "gripper_events": [
+          {
+            "turn_idx": 3,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.7606,
+              0.1299,
+              0.0247
+            ],
+            "gripper_opening": 0.995
+          }
+        ]
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.7162,
+          0.1349,
+          0.1323
+        ],
+        "gripper_opening": 0.99
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.7606,
+          0.1312,
+          0.1413
+        ],
+        "gripper_opening": 0.995
+      },
+      "turn_eval_success": false,
+      "turn_eval_reward": 0.0022310487704656212,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_03.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_04.png"
+            },
+            {
+              "type": "text",
+              "text": "Generic verification checklist (apply before giving a verdict):\n1. Look at both images carefully and list every object that is relevant to the goal.\n2. A single 2D camera view can be misleading about height, depth and contact; objects that appear to overlap may be far apart, and an object near the gripper may or may not be held.\n3. Check the stacking order and vertical relation of the objects explicitly instead of assuming it from their screen positions.\n4. Check whether the gripper fingers are open or closed and whether an object is between them.\n5. Check whether the robot arm occludes any object that matters for the goal.\n6. Do not assume an action happened just because it would be the next logical step; describe only what is visible.\n7. If the evidence is ambiguous, prefer UNCERTAIN over guessing COMPLETE or NOT COMPLETE.\n8. Base the verdict only on what the two images show, and state the concrete visual evidence."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: The robot arm has moved slightly to the right and rotated, bringing the gripper closer to the green cube.\nGripper & Occlusion Check: The gripper is open and empty. The red cube is not visible in the current view; it may be occluded by the robot arm or out of frame. The green cube is on the table surface. There is no stacking of objects visible.\nVerdict: NOT COMPLETE \u2014 The red cube is not placed on top of the green cube, and the gripper is currently empty.",
+      "vdm_call_index": 8,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "NOT COMPLETE",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Generic Verification Checklist]\n- The assessment below was produced by a visual verification module that compared the previous and current camera images.\n- A single 2D view can be ambiguous about height, contact and stacking order.\n- Check the gripper state and object relations before deciding on the next action.\n- Prefer verifying with perception over assuming the outcome of an action.\n[Visual Differencing Assessment]\nPhysical Change: The robot arm has moved slightly to the right and rotated, bringing the gripper closer to the green cube.\nGripper & Occlusion Check: The gripper is open and empty. The red cube is not visible in the current view; it may be occluded by the robot arm or out of frame. The green cube is on the table surface. There is no stacking of objects visible.\nVerdict: NOT COMPLETE \u2014 The red cube is not placed on top of the green cube, and the gripper is currently empty.",
+      "decision_after": "regenerate",
+      "decision_call_index": 9,
+      "decision_raw_response": null,
+      "turn_wall_time": 23.137315034866333
+    },
+    {
+      "turn_idx": 4,
+      "generated_code": "import numpy as np\nfrom scipy.spatial.transform import Rotation as R\n\ndef mask_to_world_points(mask, depth, K, cam_ext):\n    ys, xs = np.where(mask)\n    zs = depth[ys, xs]\n    valid = zs > 0\n    xs, ys, zs = xs[valid], ys[valid], zs[valid]\n    fx, fy = K[0, 0], K[1, 1]\n    cx, cy = K[0, 2], K[1, 2]\n    xc = (xs - cx) * zs / fx\n    yc = (ys - cy) * zs / fy\n    pts_cam = np.stack([xc, yc, zs], axis=1)\n    pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)\n    pts_world = (cam_ext @ pts_cam_h.T).T[:, :3]\n    return pts_world\n\ndef mat_to_quat_wxyz(T):\n    rot = R.from_matrix(T[:3, :3])\n    q = rot.as_quat()\n    return np.array([q[3], q[0], q[1], q[2]])\n\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\ncam_ext = cam[\"pose_mat\"]\n\n# Locate both cubes\nred_res = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\ngreen_res = segment_sam3_text_prompt(rgb, text_prompt=\"green cube\")\nprint(\"red results\", [(r[\"box\"], r[\"score\"]) for r in red_res])\nprint(\"green results\", [(r[\"box\"], r[\"score\"]) for r in green_res])\n\nred_best = max(red_res, key=lambda d: d[\"score\"])\ngreen_best = max(green_res, key=lambda d: d[\"score\"])\nred_mask = red_best[\"mask\"]\ngreen_mask = green_best[\"mask\"]\n\nred_pts = mask_to_world_points(red_mask, depth, K, cam_ext)\ngreen_pts = mask_to_world_points(green_mask, depth, K, cam_ext)\nred_obb = get_oriented_bounding_box_from_3d_points(red_pts)\ngreen_obb = get_oriented_bounding_box_from_3d_points(green_pts)\nred_center = red_obb[\"center\"]\ngreen_center = green_obb[\"center\"]\nred_extent = red_obb[\"extent\"]\ngreen_extent = green_obb[\"extent\"]\nprint(\"red center\", red_center, \"extent\", red_extent)\nprint(\"green center\", green_center, \"extent\", green_extent)\n\n# Grasp the red cube\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_mask.astype(np.int32))\ngrasps_world = np.array([cam_ext @ T for T in grasp_poses])\nbest_idx = int(np.argmax(grasp_scores))\nbest_T = grasps_world[best_idx]\ngrasp_pos = best_T[:3, 3]\ngrasp_quat = mat_to_quat_wxyz(best_T)\napproach_dir = best_T[:3, 2]\nprint(\"grasp pos\", grasp_pos, \"approach\", approach_dir)\n\npre_pos = grasp_pos - approach_dir * 0.08\njoints = solve_ik(pre_pos, grasp_quat)\nmove_to_joints(joints)\njoints = solve_ik(grasp_pos, grasp_quat)\nmove_to_joints(joints)\nclose_gripper()\n\nlift_pos = grasp_pos + np.array([0, 0, 0.15])\njoints = solve_ik(lift_pos, grasp_quat)\nmove_to_joints(joints)\n\n# Place red cube on top of green cube\nred_half_height = red_extent[2] / 2.0\ngreen_top = green_center[2] + green_extent[2] / 2.0\ntarget_red_center = np.array([green_center[0], green_center[1], green_top + red_half_height])\noffset = grasp_pos - red_center\ntarget_grasp_pos = target_red_center + offset\n\nabove_pos = target_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(above_pos, grasp_quat)\nmove_to_joints(joints)\njoints = solve_ik(target_grasp_pos, grasp_quat)\nmove_to_joints(joints)\nopen_gripper()\nretreat_pos = target_grasp_pos + np.array([0, 0, 0.12])\njoints = solve_ik(retreat_pos, grasp_quat)\nmove_to_joints(joints)",
+      "generated_by_call": 9,
+      "stdout": "red results [([403.7808532714844, 302.1244201660156, 432.1720886230469, 322.2164001464844], 0.1171875), ([417.64398193359375, 409.0774230957031, 495.20465087890625, 491.6329650878906], 0.033203125), ([327.83892822265625, -15.137847900390625, 508.14044189453125, 353.6413879394531], 0.01275634765625), ([322.4600830078125, -37.99354553222656, 507.18218994140625, 348.0654296875], 0.01171875), ([409.2476806640625, 308.9989318847656, 431.247802734375, 321.9461975097656], 0.01104736328125), ([364.7447204589844, 12.056920051574707, 373.9949035644531, 19.83047866821289], 0.01104736328125), ([403.59814453125, 302.2054748535156, 431.988037109375, 322.0251159667969], 0.01080322265625), ([159.16629028320312, 39.15836715698242, 337.0919494628906, 107.01473999023438], 0.01031494140625), ([403.68463134765625, 302.1405334472656, 412.0408935546875, 318.8877868652344], 0.010009765625), ([334.5079650878906, 13.595626831054688, 502.0317077636719, 346.30078125], 0.00970458984375), ([333.8674621582031, 100.84716033935547, 337.4839782714844, 106.5082778930664], 0.00958251953125), ([433.3360900878906, 321.3826599121094, 459.1016540527344, 340.4732360839844], 0.00927734375), ([14.304901123046875, -15.078598022460938, 503.2084045410156, 374.9521484375], 0.009033203125), ([404.6844482421875, 302.76385498046875, 460.035888671875, 336.80535888671875], 0.00860595703125), ([322.8961181640625, -14.466171264648438, 487.1229248046875, 341.01568603515625], 0.0084228515625), ([403.45379638671875, 302.4713439941406, 410.53204345703125, 319.2427062988281], 0.00726318359375), ([395.45782470703125, -3.2743797302246094, 462.75048828125, 31.993778228759766], 0.00714111328125), ([403.8701477050781, 302.53125, 411.0025329589844, 319.6856689453125], 0.006622314453125), ([398.0957946777344, 11.157310485839844, 494.1491394042969, 98.77074432373047], 0.00653076171875), ([401.6277160644531, 301.3941345214844, 465.7428894042969, 341.2553405761719], 0.00653076171875), ([404.064453125, 302.4149475097656, 410.92852783203125, 318.6887512207031], 0.006072998046875), ([-4.1262969970703125, 122.5145263671875, 452.63958740234375, 490.89666748046875], 0.005828857421875), ([415.05682373046875, 311.5870666503906, 431.07525634765625, 321.5325012207031], 0.005462646484375), ([341.2813415527344, 15.506790161132812, 461.3232116699219, 329.6395263671875], 0.005279541015625), ([0.0807647705078125, 104.89593505859375, 445.46240234375, 359.082763671875], 0.005279541015625), ([166.3856658935547, 46.0936279296875, 174.86842346191406, 69.64633178710938], 0.005218505859375), ([356.9690856933594, 208.83807373046875, 435.6563415527344, 325.73974609375], 0.005157470703125), ([-14.497360229492188, 108.80476379394531, 440.69622802734375, 332.21356201171875], 0.00506591796875), ([323.4896240234375, -23.36627197265625, 492.43609619140625, 338.1919860839844], 0.00494384765625), ([-9.905288696289062, 99.853271484375, 473.94122314453125, 493.80865478515625], 0.00482177734375), ([0.332275390625, 86.81150817871094, 433.2896728515625, 354.52703857421875], 0.00482177734375), ([404.0135192871094, 31.01922607421875, 461.8555603027344, 75.11969757080078], 0.00469970703125), ([402.16900634765625, 303.98040771484375, 410.2666015625, 319.6641845703125], 0.00469970703125), ([-7.50457763671875, 78.33450317382812, 370.3088073730469, 345.8457946777344], 0.004638671875), ([403.4219970703125, 302.8425598144531, 409.494873046875, 314.3174133300781], 0.004638671875), ([433.9110107421875, 321.7969665527344, 457.91717529296875, 339.9963684082031], 0.00457763671875), ([191.737060546875, 29.77569580078125, 467.5830078125, 329.55426025390625], 0.004058837890625), ([403.6186828613281, 302.5945129394531, 409.2140197753906, 311.4592590332031], 0.003997802734375), ([6.220314025878906, 70.65170288085938, 127.41741180419922, 108.28738403320312], 0.00390625), ([27.844528198242188, 69.88238525390625, 177.50216674804688, 107.36004638671875], 0.0037994384765625), ([324.4459533691406, -34.30712127685547, 391.6684265136719, 103.30680084228516], 0.0037994384765625), ([357.5972900390625, 193.04376220703125, 387.7745361328125, 221.183837890625], 0.0037384033203125), ([356.4246826171875, 224.4151611328125, 436.766357421875, 321.66351318359375], 0.0037384033203125), ([326.1015930175781, -60.782196044921875, 513.603759765625, 304.9093933105469], 0.0037384033203125), ([-16.800872802734375, 106.65052795410156, 397.5614013671875, 501.05499267578125], 0.003692626953125), ([356.14453125, 192.80442810058594, 365.92291259765625, 201.80030822753906], 0.0035247802734375), ([364.1261291503906, 193.32656860351562, 387.3687438964844, 214.39752197265625], 0.00347900390625), ([334.60162353515625, -2.246248245239258, 371.494873046875, 63.3741455078125], 0.00347900390625), ([11.566680908203125, 58.23443603515625, 459.0535888671875, 341.9101257324219], 0.00341796875), ([352.08709716796875, 299.03631591796875, 457.43170166015625, 336.31591796875], 0.00341796875), ([12.526771545410156, 74.16488647460938, 128.13546752929688, 108.34797668457031], 0.00335693359375), ([16.94947052001953, 67.59168243408203, 154.0047607421875, 106.07393646240234], 0.0033111572265625), ([355.2573547363281, 196.55703735351562, 375.8332824707031, 224.222900390625], 0.0032196044921875), ([354.6854553222656, 222.6035919189453, 438.3357849121094, 321.7456359863281], 0.00311279296875), ([360.72906494140625, 193.46299743652344, 384.6197509765625, 216.1273956298828], 0.0030670166015625), ([370.71026611328125, 12.35304069519043, 376.4310302734375, 19.356821060180664], 0.0030670166015625), ([343.185546875, 286.151123046875, 435.26739501953125, 322.6845703125], 0.00299072265625), ([-22.376800537109375, 154.3087158203125, 201.89190673828125, 357.34735107421875], 0.0029449462890625), ([401.5574035644531, -5.527579307556152, 469.5431213378906, 35.81017303466797], 0.002838134765625), ([333.70697021484375, 280.8794860839844, 434.1083984375, 321.3111267089844], 0.0028076171875), ([468.3904113769531, 299.3659362792969, 518.703857421875, 339.2123107910156], 0.0027313232421875), ([367.4165344238281, 297.90924072265625, 458.1254577636719, 333.9544677734375], 0.002685546875), ([-5.826988220214844, 60.65064239501953, 151.462890625, 275.9487609863281], 0.002685546875), ([-35.60020446777344, 164.1623077392578, 184.29336547851562, 412.2977294921875], 0.0026397705078125), ([421.2825927734375, 314.3116149902344, 432.28814697265625, 321.7088317871094], 0.0026397705078125), ([314.3957824707031, -59.03407287597656, 526.7080078125, 357.24151611328125], 0.0026397705078125), ([466.3802185058594, 293.51531982421875, 514.93994140625, 336.9293212890625], 0.002593994140625), ([308.56402587890625, -48.52294921875, 513.5704956054688, 349.2660217285156], 0.0024566650390625), ([237.1044464111328, -6.0289764404296875, 510.30865478515625, 340.92974853515625], 0.0023345947265625), ([422.23126220703125, 315.25225830078125, 430.83367919921875, 321.8341064453125], 0.0022735595703125), ([83.01390075683594, 81.92652893066406, 137.3436279296875, 106.40188598632812], 0.0022735595703125), ([-5.13873291015625, 1.240081787109375, 405.2418518066406, 300.98431396484375], 0.0021820068359375), ([404.2593078613281, 302.6365966796875, 408.8625183105469, 310.11383056640625], 0.0021820068359375), ([153.25303649902344, -53.48146057128906, 473.1900634765625, 118.68299865722656], 0.0021820068359375), ([365.8096618652344, 272.5087585449219, 461.6900939941406, 340.2879333496094], 0.0021820068359375), ([309.27056884765625, 58.866661071777344, 338.83245849609375, 106.4184799194336], 0.0021820068359375), ([308.4986572265625, 234.99014282226562, 456.13623046875, 333.1540222167969], 0.0021820068359375), ([201.37356567382812, 262.1431884765625, 440.4731140136719, 338.651123046875], 0.0021209716796875), ([406.1379089355469, 304.8059387207031, 411.6477355957031, 314.4366760253906], 0.0021209716796875), ([326.60797119140625, -15.910247802734375, 495.768310546875, 337.2886962890625], 0.0020599365234375), ([322.2300109863281, -19.7734375, 498.8225402832031, 337.2373352050781], 0.0020599365234375), ([4.187328338623047, 66.65274047851562, 72.89938354492188, 106.61300659179688], 0.0020599365234375), ([420.3200988769531, 311.74420166015625, 430.7262878417969, 321.62396240234375], 0.0019989013671875), ([305.7976989746094, 63.10591506958008, 332.9335632324219, 104.02607727050781], 0.0019989013671875), ([81.25394439697266, 288.6983947753906, 135.42440795898438, 324.0993957519531], 0.00194549560546875), ([307.2964172363281, -33.26612854003906, 509.1062316894531, 340.94427490234375], 0.00194549560546875), ([348.5654296875, 86.58395385742188, 462.5904541015625, 330.5846862792969], 0.00194549560546875), ([44.50349426269531, -55.43324279785156, 509.94317626953125, 391.43463134765625], 0.00194549560546875), ([290.5561218261719, -86.56954956054688, 550.24951171875, 351.4083557128906], 0.0018768310546875), ([-0.977203369140625, 38.820064544677734, 274.0875244140625, 154.89002990722656], 0.0018768310546875), ([165.421142578125, 59.334381103515625, 179.45159912109375, 90.01081848144531], 0.0018768310546875), ([58.16331100463867, 67.67170715332031, 172.614501953125, 106.95414733886719], 0.0018768310546875), ([313.8069763183594, 81.08949279785156, 337.3259582519531, 106.16046142578125], 0.0018768310546875), ([86.62300872802734, 69.67963409423828, 332.8312683105469, 149.57461547851562], 0.00182342529296875), ([328.4812316894531, 96.28238677978516, 337.6491394042969, 106.6736068725586], 0.00177001953125), ([352.1331787109375, 187.67681884765625, 445.84771728515625, 325.0355224609375], 0.00177001953125), ([400.2204895019531, 302.8623962402344, 407.6835632324219, 316.8341369628906], 0.00177001953125), ([355.8048095703125, 193.2773895263672, 367.04595947265625, 202.32200622558594], 0.00177001953125), ([385.4547424316406, 4.2195940017700195, 400.1331481933594, 23.333011627197266], 0.0016632080078125), ([184.49244689941406, 258.6474304199219, 399.45050048828125, 327.5128479003906], 0.0016632080078125), ([405.9429626464844, 306.8559265136719, 411.6601867675781, 317.7127990722656], 0.00160980224609375), ([165.6299591064453, 45.08049011230469, 175.5086212158203, 70.22171020507812], 0.00160980224609375), ([354.2980041503906, -8.916707992553711, 375.4536437988281, 23.020374298095703], 0.00160980224609375), ([140.14340209960938, -43.09335708618164, 343.3783264160156, 109.52174377441406], 0.001556396484375), ([353.1037902832031, 263.84808349609375, 452.9354553222656, 334.9649658203125], 0.001556396484375), ([78.88407897949219, 195.8553009033203, 313.08013916015625, 341.0230712890625], 0.001556396484375), ([411.1331787109375, 306.53680419921875, 421.799072265625, 320.82232666015625], 0.00151824951171875), ([-7.333728790283203, 109.7413101196289, 75.22683715820312, 197.06790161132812], 0.00151824951171875), ([30.459266662597656, 164.47409057617188, 265.3545837402344, 351.4076232910156], 0.00151824951171875), ([110.27411651611328, 230.2134552001953, 137.85284423828125, 261.3923645019531], 0.00147247314453125), ([329.64862060546875, 77.35652160644531, 346.6461181640625, 109.16311645507812], 0.00147247314453125), ([35.88645553588867, 272.76849365234375, 72.06744384765625, 318.1419677734375], 0.00142669677734375), ([418.6539306640625, 450.90631103515625, 470.34033203125, 491.39630126953125], 0.00138092041015625), ([427.59814453125, -4.1023054122924805, 455.8990478515625, 23.725723266601562], 0.00138092041015625), ([333.7119140625, -93.48709106445312, 502.57177734375, 191.994384765625], 0.00138092041015625), ([355.2494201660156, 177.6722412109375, 432.1204528808594, 293.1498718261719], 0.00138092041015625), ([94.01139831542969, 11.033905029296875, 320.73345947265625, 202.0401611328125], 0.00138092041015625), ([357.3787841796875, 193.00872802734375, 376.37921142578125, 216.71884155273438], 0.0012969970703125), ([419.2687683105469, 441.8521423339844, 439.3472595214844, 480.9590759277344], 0.00122833251953125), ([365.1744079589844, 11.463623046875, 380.9684753417969, 31.350116729736328], 0.00118255615234375), ([416.84228515625, 416.06634521484375, 451.85821533203125, 487.49102783203125], 0.00118255615234375), ([427.6966247558594, 4.978000640869141, 460.7510681152344, 70.86349487304688], 0.00115203857421875), ([329.71685791015625, 10.656381607055664, 363.52581787109375, 65.25506591796875], 0.00115203857421875), ([128.9370574951172, 288.0101318359375, 163.08396911621094, 324.5892333984375], 0.00115203857421875), ([331.25689697265625, 56.85752868652344, 356.51495361328125, 103.17201232910156], 0.00115203857421875), ([328.1087951660156, 278.48486328125, 413.2699890136719, 318.61175537109375], 0.00115203857421875), ([435.28631591796875, 318.92926025390625, 445.59417724609375, 327.05413818359375], 0.00115203857421875), ([163.71624755859375, -12.058357238769531, 328.752685546875, 87.20911407470703], 0.00104522705078125), ([426.1968078613281, 11.358043670654297, 461.0674743652344, 75.68064880371094], 0.00104522705078125), ([84.92361450195312, 172.53846740722656, 121.86463928222656, 217.35523986816406], 0.00104522705078125), ([146.3904571533203, 211.27418518066406, 208.1525421142578, 300.3377990722656], 0.00101470947265625), ([147.7447052001953, 269.309326171875, 226.6106719970703, 346.25189208984375], 0.00101470947265625), ([386.4864196777344, 285.6773376464844, 431.5243835449219, 316.3827819824219], 0.00101470947265625), ([157.0156707763672, 260.5943908691406, 188.9704132080078, 309.1963195800781], 0.00101470947265625), ([429.20562744140625, 408.0360107421875, 461.0428466796875, 439.45062255859375], 0.00101470947265625), ([85.01569366455078, 203.56460571289062, 117.45781707763672, 247.257080078125], 0.00098419189453125), ([359.3869934082031, 202.1339874267578, 377.4631652832031, 225.5193328857422], 0.00098419189453125), ([329.19305419921875, 279.14324951171875, 404.267822265625, 338.596435546875], 0.00098419189453125), ([310.9441223144531, 195.1342315673828, 404.0646057128906, 280.9021911621094], 0.000949859619140625), ([441.2114562988281, 404.3386535644531, 471.3013610839844, 428.0934753417969], 0.000949859619140625), ([315.7713623046875, -10.660337448120117, 331.08074951171875, 23.026185989379883], 0.00092315673828125), ([322.289794921875, 102.09181213378906, 342.50360107421875, 112.66914367675781], 0.00092315673828125), ([440.0900573730469, 0.4760274887084961, 463.6335754394531, 27.613494873046875], 0.00092315673828125), ([153.21644592285156, 196.34774780273438, 190.57200622558594, 258.8782653808594], 0.00089263916015625), ([301.6717224121094, -14.062763214111328, 322.1493835449219, 53.90584945678711], 0.00089263916015625), ([360.3368225097656, 295.9474792480469, 380.6064147949219, 314.8962707519531], 0.0008697509765625), ([466.0044860839844, 127.4366226196289, 497.7446594238281, 180.19403076171875], 0.0008697509765625), ([310.9198303222656, -31.088253021240234, 348.9393615722656, 104.719482421875], 0.0008697509765625), ([219.82867431640625, 266.1351623535156, 285.8934326171875, 323.1642150878906], 0.0008697509765625), ([185.42446899414062, 274.37127685546875, 225.60122680664062, 318.30828857421875], 0.0008697509765625), ([399.10137939453125, 300.8443603515625, 406.44049072265625, 312.31060791015625], 0.0008697509765625), ([404.06097412109375, 302.841796875, 409.240234375, 312.60833740234375], 0.0008697509765625), ([436.4180603027344, 392.3663330078125, 466.2445983886719, 413.5870361328125], 0.0008697509765625), ([440.1691589355469, 449.2785339355469, 480.6983337402344, 489.4158020019531], 0.0008392333984375), ([460.4339599609375, -1.6056346893310547, 478.52215576171875, 41.03168487548828], 0.00081634521484375), ([368.2945251464844, 243.19264221191406, 421.0909118652344, 296.68682861328125], 0.00081634521484375), ([483.796142578125, 249.62437438964844, 503.04571533203125, 278.34588623046875], 0.00081634521484375), ([293.55902099609375, 10.158924102783203, 325.66851806640625, 53.674190521240234], 0.00081634521484375), ([312.8027038574219, 285.5088195800781, 359.2604675292969, 310.7934265136719], 0.00079345703125), ([159.2183837890625, 242.84320068359375, 191.67092895507812, 294.75140380859375], 0.00079345703125), ([434.32244873046875, 29.004276275634766, 462.51318359375, 80.78990173339844], 0.00079345703125), ([453.3335266113281, 0.8420906066894531, 478.8108825683594, 54.7381591796875], 0.00079345703125), ([445.5580139160156, -3.429025650024414, 476.0729675292969, 56.54185485839844], 0.000766754150390625), ([250.25222778320312, 90.69064331054688, 316.0439147949219, 131.92544555664062], 0.000766754150390625), ([400.4339599609375, 297.1173400878906, 407.86004638671875, 306.1642150878906], 0.000766754150390625), ([393.8487243652344, 119.84263610839844, 421.3602600097656, 161.5054473876953], 0.000743865966796875), ([285.1639709472656, 276.8387756347656, 370.6186218261719, 325.9704284667969], 0.0007171630859375), ([398.9375915527344, 220.59036254882812, 482.9942932128906, 295.1489562988281], 0.000698089599609375), ([330.18048095703125, 91.13802337646484, 343.3536376953125, 108.33173370361328], 0.000698089599609375), ([456.8954772949219, 3.0685958862304688, 478.9128723144531, 50.24500274658203], 0.00067901611328125), ([346.87371826171875, 42.8955078125, 367.1737060546875, 75.0698013305664], 0.00067901611328125), ([146.17735290527344, -9.176586151123047, 181.91221618652344, 18.890727996826172], 0.0006561279296875), ([462.4436950683594, 37.021671295166016, 505.5947570800781, 83.322509765625], 0.0006561279296875), ([370.67449951171875, 189.1784210205078, 385.14080810546875, 203.65257263183594], 0.000637054443359375), ([350.7372741699219, 135.5707550048828, 413.6938781738281, 202.3401641845703], 0.000637054443359375), ([394.1555480957031, -2.687191963195801, 427.3333435058594, 26.202720642089844], 0.000637054443359375), ([407.10528564453125, 135.37161254882812, 434.4635009765625, 174.61410522460938], 0.00061798095703125), ([357.48907470703125, 244.42608642578125, 392.6583251953125, 275.75048828125], 0.0005950927734375), ([362.1092529296875, 134.22349548339844, 421.2745361328125, 187.28404235839844], 0.000579833984375), ([309.9571838378906, 144.956298828125, 366.2578430175781, 190.5052490234375], 0.0005645751953125), ([406.35003662109375, 291.0796813964844, 458.26165771484375, 329.9415588378906], 0.00054168701171875), ([152.161865234375, 3.574451446533203, 222.31219482421875, 57.05720138549805], 0.00052642822265625), ([192.21670532226562, 16.007457733154297, 250.87661743164062, 73.17266845703125], 0.00052642822265625), ([165.0896453857422, 20.24292755126953, 187.1077423095703, 63.608795166015625], 0.00051116943359375), ([154.71640014648438, 53.9500617980957, 187.45758056640625, 89.51715087890625], 0.00051116943359375), ([363.35870361328125, 19.44863510131836, 397.4539794921875, 75.09364318847656], 0.00051116943359375), ([149.14419555664062, 15.303741455078125, 208.39443969726562, 67.39417266845703], 0.00051116943359375), ([178.2993621826172, 33.80427551269531, 197.2672882080078, 69.66056823730469], 0.00049591064453125), ([193.57376098632812, 62.91691589355469, 250.43499755859375, 105.11203002929688], 0.00049591064453125), ([105.53959655761719, -0.5316696166992188, 127.2520751953125, 39.60140609741211], 0.00046539306640625), ([174.47921752929688, 23.414182662963867, 194.30197143554688, 63.440956115722656], 0.0004520416259765625), ([366.47503662109375, 270.44403076171875, 384.89166259765625, 291.67529296875], 0.000438690185546875), ([373.5011291503906, 245.586669921875, 385.4882507324219, 258.6976318359375], 0.0003509521484375), ([377.4378662109375, 225.82376098632812, 390.68817138671875, 241.17364501953125], 0.0003299713134765625), ([452.4018859863281, 334.6173095703125, 464.4368591308594, 344.40472412109375], 0.000301361083984375), ([481.4733581542969, 181.4018096923828, 495.8591613769531, 206.7351837158203], 0.0002918243408203125), ([412.6274108886719, 268.12542724609375, 423.8454284667969, 279.07330322265625], 0.0002918243408203125), ([398.7635803222656, 235.8896026611328, 415.3476257324219, 251.95521545410156], 0.0002918243408203125), ([449.3470458984375, 227.82289123535156, 469.35003662109375, 253.1503448486328], 0.0002651214599609375), ([454.3556823730469, 311.8546142578125, 469.2606506347656, 324.09478759765625], 0.0002346038818359375)]\ngreen results [([417.85699462890625, 409.3798828125, 495.1651611328125, 491.600830078125], 0.94921875), ([403.2015686035156, 302.6255798339844, 432.5195617675781, 322.5230407714844], 0.048828125), ([417.8099060058594, 409.62933349609375, 494.7921447753906, 491.6435546875], 0.048828125), ([433.03729248046875, 321.7449035644531, 459.16668701171875, 340.5624694824219], 0.0301513671875), ([333.7117614746094, 100.70579528808594, 337.7939147949219, 107.3883056640625], 0.028076171875), ([136.68287658691406, 63.6654052734375, 504.16790771484375, 493.00640869140625], 0.0218505859375), ([328.915771484375, -8.875030517578125, 513.7565307617188, 255.17037963867188], 0.0181884765625), ([403.3088073730469, 302.5370178222656, 414.9151916503906, 320.4691467285156], 0.0177001953125), ([43.985687255859375, 236.9669189453125, 498.5906066894531, 494.15032958984375], 0.017333984375), ([17.663131713867188, 39.64360046386719, 516.4949340820312, 385.24090576171875], 0.0164794921875), ([2.3990478515625, 44.39643096923828, 341.4630126953125, 111.73790740966797], 0.015869140625), ([6.6931915283203125, 107.26408386230469, 429.73883056640625, 480.16156005859375], 0.015869140625), ([463.292236328125, 452.1096496582031, 493.08074951171875, 485.1807556152344], 0.015380859375), ([344.8818054199219, 26.398361206054688, 514.0455322265625, 316.874755859375], 0.01495361328125), ([61.722991943359375, 341.1481018066406, 493.8535461425781, 493.0701599121094], 0.01495361328125), ([472.36358642578125, 304.8222351074219, 517.7576904296875, 346.1457214355469], 0.01446533203125), ([18.593734741210938, 43.90278625488281, 517.6127319335938, 374.6739501953125], 0.01446533203125), ([251.76510620117188, 49.911224365234375, 498.7698059082031, 493.1108093261719], 0.01446533203125), ([163.8670196533203, 26.65869140625, 512.0519409179688, 355.27557373046875], 0.01409912109375), ([341.5634765625, 48.95252990722656, 515.9202880859375, 351.44537353515625], 0.01409912109375), ([350.1526184082031, 29.861221313476562, 515.3489379882812, 326.99993896484375], 0.01318359375), ([421.17462158203125, 460.0125427246094, 479.0224609375, 492.0744323730469], 0.01318359375), ([337.08624267578125, 61.74180603027344, 503.26446533203125, 486.8255615234375], 0.01318359375), ([109.99093627929688, 384.59259033203125, 497.7245788574219, 494.94757080078125], 0.0128173828125), ([448.6339416503906, 469.7986145019531, 474.4119567871094, 492.3342590332031], 0.0128173828125), ([149.18919372558594, 329.7893981933594, 498.69586181640625, 495.3464050292969], 0.0128173828125), ([205.0032958984375, 157.61766052246094, 510.86614990234375, 490.77899169921875], 0.0128173828125), ([447.3993835449219, 410.84295654296875, 492.6508483886719, 446.68475341796875], 0.01239013671875), ([-13.730728149414062, 79.4290771484375, 385.24560546875, 341.5095520019531], 0.01239013671875), ([46.821746826171875, 391.2416687011719, 497.2788391113281, 494.0069274902344], 0.01239013671875), ([6.6123809814453125, 81.04887390136719, 381.43829345703125, 291.9075927734375], 0.0120849609375), ([477.6012878417969, 428.37164306640625, 495.4004211425781, 451.28961181640625], 0.0120849609375), ([418.7303466796875, 460.92034912109375, 460.24505615234375, 492.00103759765625], 0.01165771484375), ([23.038848876953125, 131.8992919921875, 490.4212341308594, 461.76812744140625], 0.01165771484375), ([420.12066650390625, 458.345458984375, 458.73760986328125, 492.18084716796875], 0.01165771484375), ([342.9693603515625, -23.851646423339844, 483.78033447265625, 121.4311752319336], 0.010986328125), ([-2.124847412109375, 53.27015686035156, 452.4507751464844, 319.51123046875], 0.0106201171875), ([44.945159912109375, 78.99396514892578, 336.9134521484375, 110.59192657470703], 0.0106201171875), ([38.742523193359375, 81.58740997314453, 118.25997924804688, 110.7410659790039], 0.0106201171875), ([418.7550354003906, 438.55169677734375, 437.3119812011719, 462.02581787109375], 0.0106201171875), ([8.1083984375, 72.83848571777344, 180.58856201171875, 111.21961975097656], 0.0103759765625), ([13.281005859375, 89.156005859375, 343.6962585449219, 184.994140625], 0.0103759765625), ([455.1194763183594, 410.20855712890625, 490.6011047363281, 440.1500244140625], 0.0103759765625), ([477.9523620605469, 424.1016540527344, 495.3276062011719, 444.0038757324219], 0.0103759765625), ([356.09002685546875, 192.8577423095703, 379.5675048828125, 226.1294403076172], 0.0103759765625), ([449.5461120605469, 409.4117736816406, 474.8196716308594, 428.4299621582031], 0.010009765625), ([443.8691711425781, 409.8869934082031, 481.6510314941406, 435.4595031738281], 0.010009765625), ([448.615966796875, 409.5810241699219, 472.335205078125, 427.5907287597656], 0.010009765625), ([420.1064147949219, 450.5668029785156, 443.4027404785156, 487.2326354980469], 0.010009765625), ([130.40414428710938, 96.76888275146484, 501.0447082519531, 334.79052734375], 0.010009765625), ([432.3406677246094, 408.92584228515625, 464.8644104003906, 431.560302734375], 0.010009765625), ([446.3830261230469, 409.0899353027344, 468.4261169433594, 425.4731140136719], 0.00970458984375), ([4.862693786621094, 74.06912994384766, 136.26266479492188, 110.3133773803711], 0.00970458984375), ([28.410789489746094, 75.7763671875, 138.24880981445312, 111.96560668945312], 0.00970458984375), ([420.1107482910156, 465.47625732421875, 449.8553161621094, 492.12847900390625], 0.00970458984375), ([4.611118316650391, 76.39712524414062, 84.3963623046875, 112.80552673339844], 0.00970458984375), ([354.1685791015625, 196.0348358154297, 372.89776611328125, 229.39833068847656], 0.0093994140625), ([443.9985046386719, 409.43060302734375, 469.2879943847656, 427.63916015625], 0.0093994140625), ([191.2947998046875, 65.4224624633789, 320.5787658691406, 110.15978240966797], 0.0093994140625), ([418.05364990234375, 438.58612060546875, 442.52252197265625, 477.93145751953125], 0.0093994140625), ([2.6576156616210938, 135.38906860351562, 141.14846801757812, 288.8987731933594], 0.00909423828125), ([435.05792236328125, 464.48345947265625, 461.2884521484375, 489.392333984375], 0.00909423828125), ([418.3875732421875, 434.807861328125, 439.27923583984375, 461.3260498046875], 0.00909423828125), ([75.0032958984375, 323.7214660644531, 512.0054931640625, 499.1523742675781], 0.00909423828125), ([418.35662841796875, 437.1990661621094, 446.43212890625, 467.5466613769531], 0.00909423828125), ([-13.624931335449219, 348.0851135253906, 243.70849609375, 505.9262390136719], 0.00909423828125), ([2.2777633666992188, 110.81831359863281, 144.43902587890625, 233.82252502441406], 0.00885009765625), ([73.6172866821289, 77.49617767333984, 170.86996459960938, 110.43981170654297], 0.00885009765625), ([434.9097595214844, 408.6517639160156, 461.3387756347656, 427.3238830566406], 0.00885009765625), ([445.0898132324219, 408.5678405761719, 469.4909362792969, 426.7358093261719], 0.00885009765625), ([439.90283203125, 409.4826965332031, 465.38238525390625, 427.5368957519531], 0.00885009765625), ([425.28631591796875, 407.2179260253906, 456.0870361328125, 432.3041687011719], 0.00885009765625), ([419.5794372558594, 444.2012634277344, 442.6457214355469, 481.3755187988281], 0.00885009765625), ([15.053390502929688, 73.7813491821289, 129.74700927734375, 111.37773895263672], 0.008544921875), ([437.60321044921875, 409.2822570800781, 462.99688720703125, 428.4943542480469], 0.008544921875), ([-13.954681396484375, 347.91827392578125, 237.2776641845703, 513.1716918945312], 0.008544921875), ([-1.8788604736328125, 75.7901382446289, 35.580204010009766, 111.25220489501953], 0.00836181640625), ([429.3353271484375, 408.3184814453125, 461.1793212890625, 431.9609375], 0.00836181640625), ([0.15015411376953125, 385.9571838378906, 238.80877685546875, 507.1164855957031], 0.008056640625), ([12.84033203125, 210.79708862304688, 159.32040405273438, 356.7406311035156], 0.008056640625), ([1.6588058471679688, 90.8492431640625, 179.20016479492188, 237.79428100585938], 0.008056640625), ([428.35736083984375, 409.23590087890625, 452.02789306640625, 427.12957763671875], 0.008056640625), ([180.12814331054688, 85.61392974853516, 274.5650329589844, 113.0486068725586], 0.008056640625), ([391.9188537597656, 66.2400131225586, 516.2402954101562, 281.6872863769531], 0.008056640625), ([356.0989990234375, 173.66815185546875, 405.550048828125, 221.23477172851562], 0.008056640625), ([15.533584594726562, 337.7620544433594, 395.86724853515625, 501.4582214355469], 0.008056640625), ([418.80548095703125, 445.7841796875, 439.675048828125, 476.37457275390625], 0.0078125), ([403.93975830078125, 270.96392822265625, 504.98876953125, 345.34246826171875], 0.0078125), ([469.2567138671875, 273.042724609375, 519.482666015625, 342.2894287109375], 0.0078125), ([156.2065887451172, 183.3780517578125, 497.29473876953125, 340.34503173828125], 0.007568359375), ([13.965072631835938, 121.59343719482422, 300.2060546875, 253.50802612304688], 0.007568359375), ([11.019599914550781, 333.17620849609375, 107.8309326171875, 421.8446044921875], 0.007568359375), ([296.8580322265625, 406.5160217285156, 491.0677490234375, 521.4443359375], 0.00732421875), ([417.4447937011719, 422.2974548339844, 439.3650207519531, 451.9421081542969], 0.00732421875), ([417.9995422363281, 418.74365234375, 434.3662414550781, 437.6282958984375], 0.007110595703125), ([148.6470489501953, 93.39093017578125, 182.72413635253906, 115.34103393554688], 0.007110595703125), ([7.7048797607421875, 271.10308837890625, 67.56085968017578, 359.74420166015625], 0.007110595703125), ([79.46302795410156, 95.1076889038086, 186.15394592285156, 143.09127807617188], 0.007110595703125), ([39.79426574707031, 388.4967956542969, 181.04666137695312, 485.4483947753906], 0.007110595703125), ([137.10946655273438, 150.42355346679688, 346.0901184082031, 227.98965454101562], 0.00689697265625), ([366.2378845214844, 178.659423828125, 462.3261413574219, 304.8554382324219], 0.00689697265625), ([293.7146911621094, 97.98915100097656, 354.0167541503906, 155.04786682128906], 0.00689697265625), ([58.92206954956055, 364.2980651855469, 157.5113525390625, 441.7632751464844], 0.006683349609375), ([8.664571762084961, 392.7080383300781, 59.894622802734375, 462.5300598144531], 0.006683349609375), ([61.22393798828125, 169.62838745117188, 160.2130584716797, 259.8777770996094], 0.006683349609375), ([46.945579528808594, 146.44615173339844, 129.27401733398438, 219.70152282714844], 0.006683349609375), ([433.74737548828125, 318.79095458984375, 458.87109375, 336.478759765625], 0.006683349609375), ([387.7699890136719, 265.2537841796875, 449.1260681152344, 329.6253662109375], 0.006683349609375), ([227.4413604736328, 139.48170471191406, 280.8344421386719, 178.6985321044922], 0.0064697265625), ([11.785972595214844, 361.5331726074219, 170.55844116210938, 476.7376403808594], 0.0064697265625), ([453.2052917480469, 412.3858337402344, 488.3028869628906, 441.2748107910156], 0.0064697265625), ([47.42670440673828, 279.6159973144531, 82.69257354736328, 318.0059509277344], 0.0064697265625), ([223.9031219482422, 391.174560546875, 516.5624389648438, 492.009765625], 0.0064697265625), ([69.52628326416016, 286.1277770996094, 119.45867156982422, 329.1599426269531], 0.00628662109375), ([413.1836242675781, 434.6384582519531, 440.3836975097656, 481.7878112792969], 0.00628662109375), ([434.8392333984375, 325.70147705078125, 456.240234375, 339.636962890625], 0.00628662109375), ([357.309326171875, 208.30409240722656, 411.501953125, 306.47576904296875], 0.006103515625), ([70.38644409179688, 346.53289794921875, 304.58251953125, 472.17718505859375], 0.006103515625), ([27.005443572998047, 386.2940979003906, 78.30314636230469, 448.1062316894531], 0.006103515625), ([435.01947021484375, 318.7626037597656, 452.92303466796875, 332.5846862792969], 0.00592041015625), ([50.142066955566406, 362.633544921875, 104.86731719970703, 426.50213623046875], 0.00592041015625), ([90.42141723632812, 122.85028076171875, 133.10458374023438, 158.77175903320312], 0.00592041015625), ([73.0494155883789, 379.9559326171875, 131.10995483398438, 440.08673095703125], 0.00592041015625), ([182.80064392089844, 180.98953247070312, 233.49534606933594, 219.8896484375], 0.00592041015625), ([293.9646301269531, 402.609130859375, 476.0589294433594, 490.12139892578125], 0.00592041015625), ([438.6904602050781, 323.3258972167969, 462.3213195800781, 342.4897155761719], 0.00592041015625), ([116.96424102783203, 131.19375610351562, 154.5443878173828, 167.44363403320312], 0.0057373046875), ([98.66714477539062, 223.5630340576172, 177.34100341796875, 306.896484375], 0.0057373046875), ([329.2661437988281, 99.64627075195312, 334.5148620605469, 108.60029602050781], 0.0057373046875), ([145.2300262451172, 376.3338928222656, 327.65966796875, 482.1451721191406], 0.00555419921875), ([106.40582275390625, 389.0638427734375, 377.9045715332031, 492.8494873046875], 0.00555419921875), ([28.158666610717773, 390.247314453125, 77.93077087402344, 450.949951171875], 0.00555419921875), ([93.27137756347656, 394.0546569824219, 190.1199188232422, 481.0724792480469], 0.00555419921875), ([46.08474349975586, 274.49700927734375, 82.3369140625, 317.53173828125], 0.00555419921875), ([-1.1316642761230469, 288.65106201171875, 41.33667755126953, 354.05096435546875], 0.00537109375), ([351.34381103515625, 103.4130859375, 393.2049560546875, 159.48858642578125], 0.00537109375), ([229.8557586669922, 272.34027099609375, 289.7769470214844, 315.83526611328125], 0.00537109375), ([381.80462646484375, 427.44256591796875, 498.71435546875, 503.88031005859375], 0.00537109375), ([122.48719024658203, 266.4402770996094, 161.71942138671875, 309.2009582519531], 0.00518798828125), ([361.5855712890625, 111.07609558105469, 404.17181396484375, 152.16346740722656], 0.00518798828125), ([350.5582580566406, 94.98411560058594, 390.4161071777344, 112.89132690429688], 0.00506591796875), ([134.463134765625, 355.2283020019531, 266.4921875, 459.7171936035156], 0.00506591796875), ([71.34748840332031, 303.7533264160156, 128.38307189941406, 356.7212829589844], 0.00506591796875), ([118.29004669189453, 342.8460388183594, 159.0160369873047, 387.7870788574219], 0.00506591796875), ([117.46884155273438, 66.58204650878906, 167.32846069335938, 113.52279663085938], 0.00506591796875), ([432.30206298828125, 435.7856750488281, 455.9132080078125, 467.2131652832031], 0.004913330078125), ([117.88616943359375, 67.92186737060547, 156.62179565429688, 113.51847076416016], 0.004913330078125), ([178.89491271972656, 296.6685485839844, 231.40565490722656, 336.9057922363281], 0.004913330078125), ([478.5484924316406, 279.744384765625, 504.4740905761719, 325.48919677734375], 0.004913330078125), ([393.45330810546875, 91.91856384277344, 432.48638916015625, 127.83370971679688], 0.0047607421875), ([493.779296875, 222.606201171875, 513.8547973632812, 266.09039306640625], 0.0047607421875), ([42.54402542114258, 164.50132751464844, 100.0511474609375, 219.5940399169922], 0.004608154296875), ([410.01318359375, 413.9014587402344, 432.3720703125, 441.3948669433594], 0.004608154296875), ([200.34193420410156, 407.9212341308594, 285.20001220703125, 476.9023742675781], 0.004608154296875), ([120.82994842529297, 339.1626281738281, 155.9547576904297, 380.3494567871094], 0.00445556640625), ([203.58482360839844, 384.07177734375, 275.135986328125, 437.417236328125], 0.004302978515625), ([494.5518493652344, 230.19459533691406, 514.6881103515625, 268.6845397949219], 0.004302978515625), ([391.3554992675781, 399.6719055175781, 419.0036315917969, 415.2576599121094], 0.00421142578125), ([265.73370361328125, 291.91656494140625, 317.97027587890625, 332.7354736328125], 0.00421142578125), ([222.64669799804688, 357.2879638671875, 274.9021911621094, 403.3109130859375], 0.00421142578125), ([155.28851318359375, 364.2367858886719, 209.78329467773438, 421.1397399902344], 0.00421142578125), ([352.2333679199219, 77.61181640625, 395.5950012207031, 113.68623352050781], 0.00421142578125), ([206.0296630859375, 236.5958251953125, 247.49478149414062, 275.1792907714844], 0.00421142578125), ([158.33004760742188, 130.8960418701172, 200.48129272460938, 182.65101623535156], 0.00408935546875), ([477.86956787109375, 15.477788925170898, 499.27593994140625, 48.958465576171875], 0.003936767578125), ([344.9835510253906, 262.49298095703125, 365.7416076660156, 292.26788330078125], 0.003936767578125), ([461.0650634765625, 331.6955871582031, 481.87652587890625, 348.6604309082031], 0.003814697265625), ([378.70672607421875, 282.2372741699219, 403.68450927734375, 308.2469177246094], 0.003814697265625), ([159.61273193359375, 393.05242919921875, 208.846923828125, 442.3868408203125], 0.003814697265625), ([474.33966064453125, 12.08712387084961, 496.088134765625, 50.090179443359375], 0.003814697265625), ([436.7135009765625, 48.889373779296875, 480.523193359375, 98.47610473632812], 0.003814697265625), ([476.787109375, 16.139205932617188, 500.76605224609375, 46.49189376831055], 0.0037078857421875), ([490.8534240722656, 148.77609252929688, 515.73388671875, 185.33233642578125], 0.0037078857421875), ([422.4108581542969, 36.033546447753906, 462.4371643066406, 88.63441467285156], 0.0037078857421875), ([268.5465087890625, 350.3097839355469, 329.50433349609375, 408.9734191894531], 0.0037078857421875), ([260.9727783203125, 413.5163879394531, 322.59295654296875, 469.6387634277344], 0.0035858154296875), ([468.55047607421875, 30.53667640686035, 492.0391845703125, 70.30711364746094], 0.0035858154296875), ([459.7961120605469, 24.65266227722168, 486.3012390136719, 65.87773895263672], 0.0035858154296875), ([484.52740478515625, 178.44407653808594, 508.91046142578125, 212.1318817138672], 0.0034942626953125), ([458.11090087890625, 61.27347183227539, 487.13616943359375, 106.73330688476562], 0.0034942626953125), ([387.4960021972656, 46.8748779296875, 429.0896301269531, 96.11093139648438], 0.0033721923828125), ([338.38177490234375, 158.12652587890625, 366.0755615234375, 196.29757690429688], 0.0033721923828125), ([376.6897277832031, 84.21643829345703, 421.6305847167969, 123.43956756591797], 0.0033721923828125), ([467.06622314453125, 351.25079345703125, 488.62054443359375, 366.00885009765625], 0.0033721923828125), ([387.6859130859375, 288.29034423828125, 411.6385498046875, 317.08258056640625], 0.003265380859375), ([446.1328430175781, 45.9282112121582, 476.0577087402344, 87.30966186523438], 0.003265380859375), ([277.28363037109375, 417.5191345214844, 336.28656005859375, 473.6048889160156], 0.003173828125), ([429.5553894042969, 319.9512634277344, 467.2358703613281, 341.4289855957031], 0.003173828125), ([213.5960235595703, 82.75665283203125, 259.2220764160156, 111.61680603027344], 0.003173828125), ([273.1673278808594, 409.6940002441406, 383.0491638183594, 490.2810974121094], 0.003173828125), ([398.8010559082031, 300.3524475097656, 410.8146667480469, 316.8995056152344], 0.003173828125), ([443.2059326171875, 264.8420104980469, 488.883544921875, 302.4183654785156], 0.003082275390625), ([339.50439453125, 372.850341796875, 372.7369384765625, 396.88604736328125], 0.003082275390625), ([411.3226013183594, 71.6930160522461, 442.3963317871094, 107.83759307861328], 0.0028839111328125), ([416.19281005859375, 315.4282531738281, 439.23028564453125, 333.4855041503906], 0.0027923583984375), ([335.7250061035156, 299.6640319824219, 358.7680358886719, 325.7474060058594], 0.00262451171875), ([404.58953857421875, 302.82147216796875, 423.07928466796875, 324.17755126953125], 0.00262451171875), ([295.35028076171875, 52.21440505981445, 336.18658447265625, 93.34123229980469], 0.002471923828125), ([311.7520751953125, 203.56069946289062, 356.0657958984375, 236.87478637695312], 0.0023193359375), ([415.921142578125, 286.6056823730469, 440.36578369140625, 309.1387634277344], 0.001922607421875)]\nred center [ 0.58206007  0.17041303 -0.11670878] extent [0.02906517 0.02694861 0.01673303]\ngreen center [ 0.74941884  0.1632759  -0.09182147] extent [0.06172085 0.04950608 0.03108082]\ngrasp pos [ 0.58429316  0.17199415 -0.13292767] approach [ 0.3479699   0.10109468 -0.93203906]\n",
+      "stderr": "",
+      "code_exec_success": true,
+      "exec_wall_time": 6.008649587631226,
+      "sim_steps_delta": 274,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 2,
+        "get_oriented_bounding_box_from_3d_points": 2,
+        "plan_grasp": 1,
+        "solve_ik": 6,
+        "move_to_joints": 6,
+        "close_gripper": 1,
+        "open_gripper": 1
+      },
+      "exec_record": {
+        "exec_ok": true,
+        "exception": null,
+        "error_line": null,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 2,
+          "get_oriented_bounding_box_from_3d_points": 2,
+          "plan_grasp": 1,
+          "solve_ik": 6,
+          "move_to_joints": 6,
+          "close_gripper": 1,
+          "open_gripper": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 6,
+          "open_gripper": 1,
+          "close_gripper": 1
+        },
+        "num_motion_calls": 8,
+        "sim_steps_delta": 274,
+        "proprio_before": {
+          "eef_xyz": [
+            0.7606,
+            0.1312,
+            0.1413
+          ],
+          "gripper_opening": 0.995
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.711,
+            0.153,
+            0.1332
+          ],
+          "gripper_opening": 0.985
+        },
+        "gripper_events": [
+          {
+            "turn_idx": 4,
+            "call": "close_gripper",
+            "eef_xyz": [
+              0.5496,
+              0.1617,
+              0.0039
+            ],
+            "gripper_opening": 0.114
+          },
+          {
+            "turn_idx": 4,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.7129,
+              0.153,
+              0.0193
+            ],
+            "gripper_opening": 0.975
+          }
+        ]
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.7606,
+          0.1312,
+          0.1413
+        ],
+        "gripper_opening": 0.995
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.711,
+          0.153,
+          0.1332
+        ],
+        "gripper_opening": 0.985
+      },
+      "turn_eval_success": false,
+      "turn_eval_reward": 0.0027546780304178314,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: place the red cube on top of the green cube and then open the gripper.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will be able to get a new observation of the environment and write new code to complete the task if needed.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_04.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_05.png"
+            },
+            {
+              "type": "text",
+              "text": "Generic verification checklist (apply before giving a verdict):\n1. Look at both images carefully and list every object that is relevant to the goal.\n2. A single 2D camera view can be misleading about height, depth and contact; objects that appear to overlap may be far apart, and an object near the gripper may or may not be held.\n3. Check the stacking order and vertical relation of the objects explicitly instead of assuming it from their screen positions.\n4. Check whether the gripper fingers are open or closed and whether an object is between them.\n5. Check whether the robot arm occludes any object that matters for the goal.\n6. Do not assume an action happened just because it would be the next logical step; describe only what is visible.\n7. If the evidence is ambiguous, prefer UNCERTAIN over guessing COMPLETE or NOT COMPLETE.\n8. Base the verdict only on what the two images show, and state the concrete visual evidence."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: The robot arm moved slightly to the right and downwards. The red cube is now visible held within the gripper fingers, whereas in the previous image it was not clearly visible or was occluded.\nGripper & Occlusion Check: The gripper appears closed, holding the red cube. The green cube is on the table surface. The red cube is currently positioned above and to the left of the green cube, but they are not stacked; the red cube is still held by the robot. The arm does not significantly occlude the target area for stacking.\nVerdict: NOT COMPLETE \u2014 The red cube is being held by the gripper and has not yet been placed on top of the green cube.",
+      "vdm_call_index": 10,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "NOT COMPLETE",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Generic Verification Checklist]\n- The assessment below was produced by a visual verification module that compared the previous and current camera images.\n- A single 2D view can be ambiguous about height, contact and stacking order.\n- Check the gripper state and object relations before deciding on the next action.\n- Prefer verifying with perception over assuming the outcome of an action.\n[Visual Differencing Assessment]\nPhysical Change: The robot arm moved slightly to the right and downwards. The red cube is now visible held within the gripper fingers, whereas in the previous image it was not clearly visible or was occluded.\nGripper & Occlusion Check: The gripper appears closed, holding the red cube. The green cube is on the table surface. The red cube is currently positioned above and to the left of the green cube, but they are not stacked; the red cube is still held by the robot. The arm does not significantly occlude the target area for stacking.\nVerdict: NOT COMPLETE \u2014 The red cube is being held by the gripper and has not yet been placed on top of the green cube.",
+      "decision_after": null,
+      "decision_call_index": null,
+      "turn_wall_time": 15.002873182296753
+    }
+  ],
+  "model_calls": [
+    {
+      "role": "vdm",
+      "purpose": "vdm_initial",
+      "turn_idx": 0,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2186,
+      "output_tokens": 148,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 2875,
+      "latency_s": 11.933533191680908,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "initial_code",
+      "turn_idx": 0,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 1928,
+      "output_tokens": 1625,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 2603,
+      "latency_s": 11.745444536209106,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ablation",
+      "turn_idx": 0,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2772,
+      "output_tokens": 99,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3769,
+      "latency_s": 11.629944801330566,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 0,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 3908,
+      "output_tokens": 1827,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 4809,
+      "latency_s": 13.058982610702515,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ablation",
+      "turn_idx": 1,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2772,
+      "output_tokens": 219,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3769,
+      "latency_s": 14.286643266677856,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 1,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 5728,
+      "output_tokens": 992,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 6645,
+      "latency_s": 7.525569438934326,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ablation",
+      "turn_idx": 2,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2772,
+      "output_tokens": 126,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3769,
+      "latency_s": 10.62076210975647,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 2,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 6619,
+      "output_tokens": 935,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 7478,
+      "latency_s": 6.581558704376221,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ablation",
+      "turn_idx": 3,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2772,
+      "output_tokens": 112,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3769,
+      "latency_s": 10.220385313034058,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 3,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 7531,
+      "output_tokens": 1104,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 8340,
+      "latency_s": 7.945799827575684,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ablation",
+      "turn_idx": 4,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2772,
+      "output_tokens": 146,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3769,
+      "latency_s": 8.849381446838379,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null
+    }
+  ],
+  "costs": {
+    "num_code_executions": 5,
+    "coding_llm_calls": 5,
+    "coding_input_tokens": 25714,
+    "coding_output_tokens": 6483,
+    "vdm_calls": 6,
+    "vdm_input_tokens": 16046,
+    "vdm_output_tokens": 850,
+    "vdm_gate_skips": 0,
+    "total_model_calls": 11,
+    "total_tokens": 49093,
+    "tool_calls": {
+      "get_observation": 5,
+      "segment_sam3_text_prompt": 10,
+      "segment_sam3_point_prompt": 0,
+      "point_prompt_molmo": 0,
+      "plan_grasp": 5,
+      "solve_ik": 24,
+      "move_to_joints": 24,
+      "open_gripper": 5,
+      "close_gripper": 3,
+      "get_oriented_bounding_box_from_3d_points": 10
+    },
+    "extra_perception_calls": 15,
+    "total_sim_steps": 923,
+    "total_wall_time": 147.54921340942383,
+    "reset_wall_time": 0.7733268737792969
+  },
+  "evaluation": {
+    "official_task_success": false,
+    "official_reward": 0.0027546780304178314,
+    "episode_code_exec_success_rate": 0.8
+  }
+}

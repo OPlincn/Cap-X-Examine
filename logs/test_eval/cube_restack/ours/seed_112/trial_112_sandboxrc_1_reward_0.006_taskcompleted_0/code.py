@@ -1,0 +1,206 @@
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+# Segment the red and green cubes
+red_masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+green_masks = segment_sam3_text_prompt(rgb, text_prompt="green cube")
+
+red_best = max(red_masks, key=lambda d: d["score"])
+green_best = max(green_masks, key=lambda d: d["score"])
+red_mask = red_best["mask"]
+green_mask = green_best["mask"]
+
+print("red box", red_best["box"], "score", red_best["score"])
+print("green box", green_best["box"], "score", green_best["score"])
+```
+
+```python
+def mask_to_world_points(mask, depth, K, cam_pose):
+    ys, xs = np.nonzero(mask)
+    zs = depth[ys, xs]
+    valid = zs > 0
+    xs, ys, zs = xs[valid], ys[valid], zs[valid]
+    fx, fy = K[0, 0], K[1, 1]
+    cx, cy = K[0, 2], K[1, 2]
+    x_cam = (xs - cx) * zs / fx
+    y_cam = (ys - cy) * zs / fy
+    pts_cam = np.stack([x_cam, y_cam, zs], axis=1)
+    pts_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)
+    pts_world = (cam_pose @ pts_h.T).T[:, :3]
+    return pts_world
+
+red_pts = mask_to_world_points(red_mask, depth, K, cam_pose)
+green_pts = mask_to_world_points(green_mask, depth, K, cam_pose)
+
+red_obb = get_oriented_bounding_box_from_3d_points(red_pts)
+green_obb = get_oriented_bounding_box_from_3d_points(green_pts)
+
+red_center = red_obb["center"]
+green_center = green_obb["center"]
+print("red center", red_center, "extent", red_obb["extent"])
+print("green center", green_center, "extent", green_obb["extent"])
+```
+
+```python
+# Plan a grasp on the red cube. Since green sits on top of red, we need to
+# approach red from the side. Use Contact-GraspNet on the red mask.
+red_seg = red_mask.astype(np.int32)
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_seg)
+print("num grasps", len(grasp_scores))
+
+# Transform to world frame
+grasps_world = np.array([cam_pose @ T for T in grasp_poses])
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasps_world[best_idx]
+print("best grasp world pos", best_T[:3, 3])
+print("best grasp score", grasp_scores[best_idx])
+```
+
+```python
+from scipy.spatial.transform import Rotation as R
+
+# Extract grasp pose
+grasp_pos = best_T[:3, 3]
+grasp_rot = best_T[:3, :3]
+quat_xyzw = R.from_matrix(grasp_rot).as_quat()
+quat_wxyz = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+
+# Pre-grasp: back off along approach axis (z of grasp frame)
+approach = grasp_rot[:, 2]
+pre_grasp_pos = grasp_pos - approach * 0.08
+
+open_gripper()
+joints_pre = solve_ik(pre_grasp_pos, quat_wxyz)
+move_to_joints(joints_pre)
+
+joints_grasp = solve_ik(grasp_pos, quat_wxyz)
+move_to_joints(joints_grasp)
+
+close_gripper()
+```
+
+```python
+# Lift the red cube up
+lift_pos = grasp_pos + np.array([0.0, 0.0, 0.15])
+joints_lift = solve_ik(lift_pos, quat_wxyz)
+move_to_joints(joints_lift)
+```
+
+```python
+# Now place red cube on top of green cube.
+# Green center is where we want to place. Compute a target above green.
+green_top_z = green_center[2] + green_obb["extent"][2] / 2.0
+red_half_z = red_obb["extent"][2] / 2.0
+place_z = green_top_z + red_half_z + 0.01
+
+# Keep the same orientation as grasp but position above green center
+place_pos = np.array([green_center[0], green_center[1], place_z + 0.10])
+joints_place_above = solve_ik(place_pos, quat_wxyz)
+move_to_joints(joints_place_above)
+
+# Lower to place
+place_pos_final = np.array([green_center[0], green_center[1], place_z])
+joints_place = solve_ik(place_pos_final, quat_wxyz)
+move_to_joints(joints_place)
+
+open_gripper()
+
+# Retreat upward
+retreat_pos = place_pos_final + np.array([0.0, 0.0, 0.12])
+joints_retreat = solve_ik(retreat_pos, quat_wxyz)
+move_to_joints(joints_retreat)
+
+# Code block 1
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+red_masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+green_masks = segment_sam3_text_prompt(rgb, text_prompt="green cube")
+
+red_best = max(red_masks, key=lambda d: d["score"])
+green_best = max(green_masks, key=lambda d: d["score"])
+red_mask = red_best["mask"]
+green_mask = green_best["mask"]
+
+def mask_to_world_points(mask, depth, K, cam_pose):
+    ys, xs = np.nonzero(mask)
+    zs = depth[ys, xs]
+    valid = zs > 0
+    xs, ys, zs = xs[valid], ys[valid], zs[valid]
+    fx, fy = K[0, 0], K[1, 1]
+    cx, cy = K[0, 2], K[1, 2]
+    x_cam = (xs - cx) * zs / fx
+    y_cam = (ys - cy) * zs / fy
+    pts_cam = np.stack([x_cam, y_cam, zs], axis=1)
+    pts_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)
+    pts_world = (cam_pose @ pts_h.T).T[:, :3]
+    return pts_world
+
+red_pts = mask_to_world_points(red_mask, depth, K, cam_pose)
+green_pts = mask_to_world_points(green_mask, depth, K, cam_pose)
+
+red_obb = get_oriented_bounding_box_from_3d_points(red_pts)
+green_obb = get_oriented_bounding_box_from_3d_points(green_pts)
+
+red_center = red_obb["center"]
+green_center = green_obb["center"]
+
+red_seg = red_mask.astype(np.int32)
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_seg)
+
+grasps_world = np.array([cam_pose @ T for T in grasp_poses])
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasps_world[best_idx]
+
+grasp_pos = best_T[:3, 3]
+grasp_rot = best_T[:3, :3]
+quat_xyzw = R.from_matrix(grasp_rot).as_quat()
+quat_wxyz = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+
+approach = grasp_rot[:, 2]
+pre_grasp_pos = grasp_pos - approach * 0.08
+
+open_gripper()
+joints_pre = solve_ik(pre_grasp_pos, quat_wxyz)
+move_to_joints(joints_pre)
+
+joints_grasp = solve_ik(grasp_pos, quat_wxyz)
+move_to_joints(joints_grasp)
+
+close_gripper()
+
+lift_pos = grasp_pos + np.array([0.0, 0.0, 0.15])
+joints_lift = solve_ik(lift_pos, quat_wxyz)
+move_to_joints(joints_lift)
+
+green_top_z = green_center[2] + green_obb["extent"][2] / 2.0
+red_half_z = red_obb["extent"][2] / 2.0
+place_z = green_top_z + red_half_z + 0.01
+
+place_pos = np.array([green_center[0], green_center[1], place_z + 0.10])
+joints_place_above = solve_ik(place_pos, quat_wxyz)
+move_to_joints(joints_place_above)
+
+place_pos_final = np.array([green_center[0], green_center[1], place_z])
+joints_place = solve_ik(place_pos_final, quat_wxyz)
+move_to_joints(joints_place)
+
+open_gripper()
+
+retreat_pos = place_pos_final + np.array([0.0, 0.0, 0.12])
+joints_retreat = solve_ik(retreat_pos, quat_wxyz)
+move_to_joints(joints_retreat)

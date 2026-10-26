@@ -1,0 +1,101 @@
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasp_poses[best_idx]
+
+grasp_world = cam_ext @ best_T
+pos = grasp_world[:3, :3]
+# approach from above: use identity-ish downward orientation
+quat = np.array([0.0, 1.0, 0.0, 0.0])  # wxyz, gripper pointing down
+
+# pre-grasp above the cube
+pre_pos = grasp_world[:3, 3].copy()
+pre_pos[2] += 0.10
+joints_pre = solve_ik(pre_pos, quat)
+move_to_joints(joints_pre)
+
+open_gripper()
+
+# move down to grasp
+grasp_pos = grasp_world[:3, 3].copy()
+grasp_pos[2] += 0.005
+joints_grasp = solve_ik(grasp_pos, quat)
+move_to_joints(joints_grasp)
+
+close_gripper()
+
+# lift
+lift_pos = grasp_pos.copy()
+lift_pos[2] += 0.15
+joints_lift = solve_ik(lift_pos, quat)
+move_to_joints(joints_lift)
+
+print("done")
+
+# Code block 1
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasp_poses[best_idx]
+grasp_world = cam_ext @ best_T
+
+quat = np.array([0.0, 1.0, 0.0, 0.0])  # wxyz, gripper pointing down
+
+# lift higher from current grasp position
+lift_pos = grasp_world[:3, 3].copy()
+lift_pos[2] += 0.25
+joints_lift = solve_ik(lift_pos, quat)
+move_to_joints(joints_lift)
+
+print("lifted")
+
+
+Environment response:
+  Sandbox failed: 1
+  Stdout: 
+  Stderr: Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 14, in <module>
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/telemetry.py", line 321, in wrapper
+    result = fn(*a, **kw)
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/integrations/franka/control_reduced.py", line 434, in plan_grasp
+    vtf.SE3.from_matrix(self._env.grasp_sample) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))
+  File "/home/oplin/PythonProjects/cap-task/cap-x/.venv/lib/python3.10/site-packages/viser/transforms/_se3.py", line 92, in from_matrix
+    assert matrix.shape[-2:] == (4, 4) or matrix.shape[-2:] == (3, 4)
+AssertionError
+
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 1
+  Num Finishes: 1
+  Num Code Blocks: 2
+----------------------------------------------------------------------------------------------------

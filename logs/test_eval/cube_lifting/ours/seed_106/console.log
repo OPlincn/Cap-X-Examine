@@ -1,0 +1,129 @@
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python /home/oplin/PythonProjects/cap-task/cap-x/capx/third_party/robosuite/robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:32)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly, otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:42)
+R1Pro not installed, skipping R1Pro APIs
+LIBERO not installed!
+R1Pro not installed!
+API server on 127.0.0.1:8114 already running, skipping
+API server on 127.0.0.1:8115 already running, skipping
+API server on 127.0.0.1:8116 already running, skipping
+[robosuite INFO] Loading controller configuration from: capx/integrations/robosuite/controllers/config/robots/panda_joint_ctrl.json (composite_controller_factory.py:121)
+init franka control api
+init grasp net plan fn
+init sam3 seg fn
+Running Trials:   0%|          | 0/1 [00:00<?, ?it/s]Time taken to query model: 8.16 seconds
+Time taken to query model: 5.88 seconds
+Grasp position: [ 0.56604478 -0.02359029 -0.10548432]
+Done lifting
+Time taken to query model: 9.69 seconds
+Time taken to query model: 1.15 seconds
+Model chose to finish
+Code blocks done
+Saved interaction video to logs/test_eval/cube_lifting/ours/seed_106/trial_106_sandboxrc_0_reward_1.000_taskcompleted_1/video_turn_00.mp4 (64 frames)
+Saved interaction video to logs/test_eval/cube_lifting/ours/seed_106/trial_106_sandboxrc_0_reward_1.000_taskcompleted_1/video_combined.mp4 (65 frames)
+Trial 106 took 30.75 seconds
+Running Trials: 100%|██████████| 1/1 [00:30<00:00, 30.88s/it]Running Trials: 100%|██████████| 1/1 [00:30<00:00, 30.88s/it]
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasp_poses[best_idx]
+
+grasp_world = cam_ext @ best_T
+pos = grasp_world[:3, 3]
+R = grasp_world[:3, :3]
+
+# Convert rotation matrix to quaternion (wxyz)
+def rot_to_quat(R):
+    t = np.trace(R)
+    if t > 0:
+        s = np.sqrt(t + 1.0) * 2
+        w = 0.25 * s
+        x = (R[2,1] - R[1,2]) / s
+        y = (R[0,2] - R[2,0]) / s
+        z = (R[1,0] - R[0,1]) / s
+    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:
+        s = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+        w = (R[2,1] - R[1,2]) / s
+        x = 0.25 * s
+        y = (R[0,1] + R[1,0]) / s
+        z = (R[0,2] + R[2,0]) / s
+    elif R[1,1] > R[2,2]:
+        s = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+        w = (R[0,2] - R[2,0]) / s
+        x = (R[0,1] + R[1,0]) / s
+        y = 0.25 * s
+        z = (R[1,2] + R[2,1]) / s
+    else:
+        s = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+        w = (R[1,0] - R[0,1]) / s
+        x = (R[0,2] + R[2,0]) / s
+        y = (R[1,2] + R[2,1]) / s
+        z = 0.25 * s
+    q = np.array([w, x, y, z])
+    return q / np.linalg.norm(q)
+
+quat = rot_to_quat(R)
+
+# Approach from above
+pre_pos = pos + np.array([0, 0, 0.1])
+open_gripper()
+joints_pre = solve_ik(pre_pos, quat)
+move_to_joints(joints_pre)
+
+joints_grasp = solve_ik(pos, quat)
+move_to_joints(joints_grasp)
+
+close_gripper()
+
+lift_pos = pos + np.array([0, 0, 0.15])
+joints_lift = solve_ik(lift_pos, quat)
+move_to_joints(joints_lift)
+
+print("Grasp position:", pos)
+print("Done lifting")
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: Grasp position: [ 0.56604478 -0.02359029 -0.10548432]
+Done lifting
+
+  Stderr: 
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 0
+  Num Finishes: 1
+  Num Code Blocks: 1
+----------------------------------------------------------------------------------------------------
+Code saved to logs/test_eval/cube_lifting/ours/seed_106/trial_106_sandboxrc_0_reward_1.000_taskcompleted_1/code.py
+
+Summary Statistics:
+Model: deepseek-v4.1-flash-1017
+Visual Differencing Model: qwen3.8-flash
+Config Path: env_configs/harness_eval/cube_lifting.yaml
+Git Commit: ed29cc7 (Dirty: True)
+Total number of trials: 1
+Code generation success rate / Average reward / Task completed: 
+1.000/1.000/1
+Average code blocks: 1.000
+Average regenerations: 0.000
+Average finishes: 1.000
+Elapsed time: 31.86 seconds

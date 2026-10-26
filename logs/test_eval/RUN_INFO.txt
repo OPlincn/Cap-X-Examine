@@ -1,0 +1,8 @@
+freeze_commit=ed29cc727de7a803e2c79004f962a3b0cec55d44
+tag=phase2-freeze
+started=2026-10-24T18:21:18+08:00
+services_log_dir=logs/services/run_20261024_181056
+ m capx/third_party/contact_graspnet_pytorch
+ m capx/third_party/sam3
+?? logs/test_eval/
+resumed=2026-10-26T13:20:45+08:00 commit=ed29cc727de7a803e2c79004f962a3b0cec55d44 services=logs/services/run_20261026_131359

@@ -1,0 +1,321 @@
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T_cam = grasp_poses[best_idx]
+
+best_T_world = cam_pose @ best_T_cam
+grasp_pos = best_T_world[:3, 3]
+grasp_quat = np.array([1.0, 0.0, 0.0, 0.0])
+
+# Approach from above
+approach_pos = grasp_pos + np.array([0.0, 0.0, 0.15])
+joints_approach = solve_ik(approach_pos, grasp_quat)
+move_to_joints(joints_approach)
+
+open_gripper()
+
+# Move down to grasp
+joints_grasp = solve_ik(grasp_pos, grasp_quat)
+move_to_joints(joints_grasp)
+
+close_gripper()
+
+# Lift
+lift_pos = grasp_pos + np.array([0.0, 0.0, 0.2])
+joints_lift = solve_ik(lift_pos, grasp_quat)
+move_to_joints(joints_lift)
+
+print("Grasp position (world):", grasp_pos)
+print("Done lifting red cube.")
+
+# Code block 1
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+# Compute 3D points of the cube in camera frame to get its center
+ys, xs = np.where(mask > 0)
+zs = depth[ys, xs]
+valid = zs > 0
+xs, ys, zs = xs[valid], ys[valid], zs[valid]
+
+fx, fy = K[0, 0], K[1, 1]
+cx, cy = K[0, 2], K[1, 2]
+X = (xs - cx) * zs / fx
+Y = (ys - cy) * zs / fy
+Z = zs
+pts_cam = np.stack([X, Y, Z], axis=1)
+
+# Transform to world frame
+pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)
+pts_world = (cam_pose @ pts_cam_h.T).T[:, :3]
+
+cube_center = pts_world.mean(axis=0)
+print("Cube center (world):", cube_center)
+
+# Grasp from above at cube center, slightly above the table
+grasp_pos = cube_center.copy()
+grasp_quat = np.array([1.0, 0.0, 0.0, 0.0])
+
+open_gripper()
+
+# Approach from above
+approach_pos = grasp_pos + np.array([0.0, 0.0, 0.15])
+joints_approach = solve_ik(approach_pos, grasp_quat)
+move_to_joints(joints_approach)
+
+# Move down to grasp
+joints_grasp = solve_ik(grasp_pos, grasp_quat)
+move_to_joints(joints_grasp)
+
+close_gripper()
+
+# Lift
+lift_pos = grasp_pos + np.array([0.0, 0.0, 0.2])
+joints_lift = solve_ik(lift_pos, grasp_quat)
+move_to_joints(joints_lift)
+
+print("Done lifting red cube.")
+
+# Code block 2
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+# Compute 3D points of the cube in camera frame
+ys, xs = np.where(mask > 0)
+zs = depth[ys, xs]
+valid = zs > 0
+xs, ys, zs = xs[valid], ys[valid], zs[valid]
+
+fx, fy = K[0, 0], K[1, 1]
+cx, cy = K[0, 2], K[1, 2]
+X = (xs - cx) * zs / fx
+Y = (ys - cy) * zs / fy
+Z = zs
+pts_cam = np.stack([X, Y, Z], axis=1)
+
+# Transform to world frame
+pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)
+pts_world = (cam_pose @ pts_cam_h.T).T[:, :3]
+
+# Use OBB to get cube center and top surface
+obb = get_oriented_bounding_box_from_3d_points(pts_world)
+cube_center = obb["center"]
+extent = obb["extent"]
+print("Cube center (world):", cube_center)
+print("Cube extent:", extent)
+
+# Grasp at the cube center height (top-ish), approach from above
+grasp_pos = cube_center.copy()
+grasp_quat = np.array([1.0, 0.0, 0.0, 0.0])
+
+open_gripper()
+
+# Approach from above
+approach_pos = grasp_pos + np.array([0.0, 0.0, 0.15])
+joints_approach = solve_ik(approach_pos, grasp_quat)
+move_to_joints(joints_approach)
+
+# Move down to grasp position
+joints_grasp = solve_ik(grasp_pos, grasp_quat)
+move_to_joints(joints_grasp)
+
+close_gripper()
+
+# Lift
+lift_pos = grasp_pos + np.array([0.0, 0.0, 0.2])
+joints_lift = solve_ik(lift_pos, grasp_quat)
+move_to_joints(joints_lift)
+
+print("Done lifting red cube.")
+
+# Code block 3
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+# Compute 3D points of the cube in camera frame
+ys, xs = np.where(mask > 0)
+zs = depth[ys, xs]
+valid = zs > 0
+xs, ys, zs = xs[valid], ys[valid], zs[valid]
+
+fx, fy = K[0, 0], K[1, 1]
+cx, cy = K[0, 2], K[1, 2]
+X = (xs - cx) * zs / fx
+Y = (ys - cy) * zs / fy
+Z = zs
+pts_cam = np.stack([X, Y, Z], axis=1)
+
+# Transform to world frame
+pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)
+pts_world = (cam_pose @ pts_cam_h.T).T[:, :3]
+
+obb = get_oriented_bounding_box_from_3d_points(pts_world)
+cube_center = obb["center"]
+extent = obb["extent"]
+print("Cube center (world):", cube_center)
+print("Cube extent:", extent)
+
+# Use grasp planner to get a proper grasp pose
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T_cam = grasp_poses[best_idx]
+best_T_world = cam_pose @ best_T_cam
+
+grasp_pos = best_T_world[:3, 3]
+# Extract rotation as quaternion (wxyz)
+R = best_T_world[:3, :3]
+# Convert rotation matrix to quaternion
+def rot_to_quat(R):
+    tr = R[0,0] + R[1,1] + R[2,2]
+    if tr > 0:
+        S = np.sqrt(tr + 1.0) * 2
+        w = 0.25 * S
+        x = (R[2,1] - R[1,2]) / S
+        y = (R[0,2] - R[2,0]) / S
+        z = (R[1,0] - R[0,1]) / S
+    elif (R[0,0] > R[1,1]) and (R[0,0] > R[2,2]):
+        S = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+        w = (R[2,1] - R[1,2]) / S
+        x = 0.25 * S
+        y = (R[0,1] + R[1,0]) / S
+        z = (R[0,2] + R[2,0]) / S
+    elif R[1,1] > R[2,2]:
+        S = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+        w = (R[0,2] - R[2,0]) / S
+        x = (R[0,1] + R[1,0]) / S
+        y = 0.25 * S
+        z = (R[1,2] + R[2,1]) / S
+    else:
+        S = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+        w = (R[1,0] - R[0,1]) / S
+        x = (R[0,2] + R[2,0]) / S
+        y = (R[1,2] + R[2,1]) / S
+        z = 0.25 * S
+    return np.array([w, x, y, z])
+
+grasp_quat = rot_to_quat(R)
+print("Grasp pos (world):", grasp_pos)
+print("Grasp quat:", grasp_quat)
+
+open_gripper()
+
+# Approach from above along grasp z-axis
+approach_pos = grasp_pos + np.array([0.0, 0.0, 0.12])
+joints_approach = solve_ik(approach_pos, grasp_quat)
+move_to_joints(joints_approach)
+
+# Move down to grasp position
+joints_grasp = solve_ik(grasp_pos, grasp_quat)
+move_to_joints(joints_grasp)
+
+close_gripper()
+
+# Lift
+lift_pos = grasp_pos + np.array([0.0, 0.0, 0.2])
+joints_lift = solve_ik(lift_pos, grasp_quat)
+move_to_joints(joints_lift)
+
+print("Done lifting red cube.")
+
+# Code block 4
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+# Compute 3D points of the cube in camera frame
+ys, xs = np.where(mask > 0)
+zs = depth[ys, xs]
+valid = zs > 0
+xs, ys, zs = xs[valid], ys[valid], zs[valid]
+
+fx, fy = K[0, 0], K[1, 1]
+cx, cy = K[0, 2], K[1, 2]
+X = (xs - cx) * zs / fx
+Y = (ys - cy) * zs / fy
+Z = zs
+pts_cam = np.stack([X, Y, Z], axis=1)
+
+pts_cam_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)
+pts_world = (cam_pose @ pts_cam_h.T).T[:, :3]
+
+obb = get_oriented_bounding_box_from_3d_points(pts_world)
+cube_center = obb["center"]
+extent = obb["extent"]
+print("Cube center (world):", cube_center)
+print("Cube extent:", extent)
+
+# Grasp from above with a downward-pointing gripper (identity orientation)
+grasp_pos = cube_center.copy()
+grasp_quat = np.array([1.0, 0.0, 0.0, 0.0])
+
+open_gripper()
+
+# Approach from above
+approach_pos = grasp_pos + np.array([0.0, 0.0, 0.15])
+joints_approach = solve_ik(approach_pos, grasp_quat)
+move_to_joints(joints_approach)
+
+# Move down to grasp position
+joints_grasp = solve_ik(grasp_pos, grasp_quat)
+move_to_joints(joints_grasp)
+
+close_gripper()
+
+# Lift
+lift_pos = grasp_pos + np.array([0.0, 0.0, 0.2])
+joints_lift = solve_ik(lift_pos, grasp_quat)
+move_to_joints(joints_lift)
+
+print("Done lifting red cube.")

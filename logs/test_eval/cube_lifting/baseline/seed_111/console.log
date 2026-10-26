@@ -1,0 +1,540 @@
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python /home/oplin/PythonProjects/cap-task/cap-x/capx/third_party/robosuite/robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:32)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly, otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:42)
+R1Pro not installed, skipping R1Pro APIs
+LIBERO not installed!
+R1Pro not installed!
+API server on 127.0.0.1:8114 already running, skipping
+API server on 127.0.0.1:8115 already running, skipping
+API server on 127.0.0.1:8116 already running, skipping
+[robosuite INFO] Loading controller configuration from: capx/integrations/robosuite/controllers/config/robots/panda_joint_ctrl.json (composite_controller_factory.py:121)
+init franka control api
+init grasp net plan fn
+init sam3 seg fn
+Running Trials:   0%|          | 0/1 [00:00<?, ?it/s]Time taken to query model: 7.56 seconds
+Time taken to query model: 3.75 seconds
+done [ 0.55461956  0.01235926 -0.10260625]
+Time taken to query model: 11.59 seconds
+Time taken to query model: 2.81 seconds
+Model chose to regenerate code
+Code block 1 done
+Number of code blocks: 2
+num masks 200
+mask score 0.00592041015625 box [141.05508422851562, -1.5261306762695312, 336.49566650390625, 106.36225128173828]
+num grasps 154
+grasp world pos [ 0.05386414  0.08681913 -0.10378269]
+grasp world rot [[-0.44277607 -0.74286192  0.5021011 ]
+ [-0.89489441  0.3312822  -0.29902523]
+ [ 0.05579729 -0.58172869 -0.81146682]]
+Time taken to query model: 5.75 seconds
+Time taken to query model: 2.91 seconds
+Model chose to regenerate code
+Code block 2 done
+Number of code blocks: 3
+num masks 200
+num candidates 170
+score 0.00592041015625 area 21085.768190622795 box [141.05508422851562, -1.5261306762695312, 336.49566650390625, 106.36225128173828]
+score 0.002349853515625 area 893.1893870607018 box [209.55001831054688, -0.9524927139282227, 283.4883117675781, 11.127707481384277]
+score 0.002105712890625 area 9770.030033167452 box [189.09854125976562, 38.841163635253906, 332.3054504394531, 107.06433868408203]
+score 0.0020599365234375 area 368.97736986284144 box [172.65223693847656, -2.335740089416504, 194.40675354003906, 14.625214576721191]
+score 0.00194549560546875 area 264.6074747564271 box [165.76422119140625, 43.43938446044922, 175.3695068359375, 70.98749542236328]
+Time taken to query model: 10.07 seconds
+Time taken to query model: 2.05 seconds
+Model chose to regenerate code
+Code block 3 done
+Number of code blocks: 4
+prompt: red cube num masks: 200
+  score 0.00592041015625 box [141.05508422851562, -1.5261306762695312, 336.49566650390625, 106.36225128173828]
+  score 0.0048828125 box [167.0576171875, -1.6507110595703125, 405.64288330078125, 292.49993896484375]
+  score 0.002349853515625 box [209.55001831054688, -0.9524927139282227, 283.4883117675781, 11.127707481384277]
+prompt: cube num masks: 200
+  score 0.0015411376953125 box [142.6310272216797, -1.4453239440917969, 336.19927978515625, 106.57041931152344]
+  score 0.00142669677734375 box [163.88394165039062, -1.4628753662109375, 405.4477844238281, 291.89874267578125]
+  score 0.000904083251953125 box [210.90582275390625, -1.0404152870178223, 284.48095703125, 11.212392807006836]
+prompt: red block num masks: 200
+  score 0.0067138671875 box [141.18243408203125, -1.6776847839355469, 336.3915710449219, 106.4083251953125]
+  score 0.006683349609375 box [168.33033752441406, -1.0402069091796875, 405.625244140625, 292.74273681640625]
+  score 0.0030670166015625 box [209.52125549316406, -0.7654299736022949, 284.60589599609375, 11.799148559570312]
+prompt: block num masks: 200
+  score 0.015625 box [0.84320068359375, 106.50628662109375, 510.5262145996094, 511.6173095703125]
+  score 0.00970458984375 box [432.5238037109375, 72.16737365722656, 507.4521484375, 107.08906555175781]
+  score 0.00927734375 box [5.2215728759765625, 72.03883361816406, 79.88701629638672, 106.97296142578125]
+prompt: red object num masks: 200
+  score 0.033203125 box [140.91168212890625, -1.341766357421875, 335.4245300292969, 105.89965057373047]
+  score 0.0234375 box [170.13223266601562, -0.9359893798828125, 405.7954406738281, 292.88201904296875]
+  score 0.0162353515625 box [141.72842407226562, -0.8294429779052734, 314.8615417480469, 42.83091735839844]
+Time taken to query model: 7.76 seconds
+Time taken to query model: 4.37 seconds
+Model chose to regenerate code
+Code block 4 done
+Number of code blocks: 5
+red pixel count 0
+Time taken to query model: 8.19 seconds
+Time taken to query model: 11.02 seconds
+Model chose to regenerate code
+Code block 5 done
+Number of code blocks: 6
+Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 27
+    ```
+    ^
+SyntaxError: invalid syntax
+Time taken to query model: 7.20 seconds
+Time taken to query model: 5.11 seconds
+Model chose to regenerate code
+Code block 6 done
+Number of code blocks: 7
+image size 512 512
+red pixel count 0
+no red pixels found
+Time taken to query model: 7.28 seconds
+Time taken to query model: 3.92 seconds
+Model chose to regenerate code
+Code block 7 done
+Number of code blocks: 8
+rgb shape (512, 512, 3)
+rgb mean [207.69848251 206.54349518 202.78154373]
+rgb min [8 8 8]
+rgb max [255 255 255]
+depth min/max/mean 0.47798532247543335 2.6457858085632324 0.8843650817871094
+depth valid count 262144
+max saturation 41
+saturated count 0
+Code blocks done
+Saved interaction video to logs/test_eval/cube_lifting/baseline/seed_111/trial_111_sandboxrc_0_reward_0.702_taskcompleted_0/video_turn_00.mp4 (180 frames)
+Saved interaction video to logs/test_eval/cube_lifting/baseline/seed_111/trial_111_sandboxrc_0_reward_0.702_taskcompleted_0/video_combined.mp4 (181 frames)
+Trial 111 took 126.92 seconds
+Running Trials: 100%|██████████| 1/1 [02:07<00:00, 127.09s/it]Running Trials: 100%|██████████| 1/1 [02:07<00:00, 127.09s/it]
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(grasp_scores.argmax())
+best_T = grasp_poses[best_idx]
+grasp_world = ext @ best_T
+
+pos = grasp_world[:3, :3]
+# approach from above: use grasp orientation but position above
+quat = np.array([1.0, 0.0, 0.0, 0.0])
+target = grasp_world[:3, 3].copy()
+target[2] += 0.1
+joints = solve_ik(target, quat)
+move_to_joints(joints)
+open_gripper()
+
+# move down to grasp
+target2 = grasp_world[:3, 3].copy()
+joints2 = solve_ik(target2, quat)
+move_to_joints(joints2)
+close_gripper()
+
+# lift
+target3 = target2.copy()
+target3[2] += 0.15
+joints3 = solve_ik(target3, quat)
+move_to_joints(joints3)
+print("done", grasp_world[:3,3])
+
+# Code block 1
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+print("num masks", len(masks))
+if len(masks) == 0:
+    print("no cube found")
+else:
+    best = max(masks, key=lambda d: d["score"])
+    mask = best["mask"].astype(np.int32)
+    print("mask score", best["score"], "box", best.get("box"))
+    grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+    print("num grasps", len(grasp_scores))
+    best_idx = int(grasp_scores.argmax())
+    best_T = grasp_poses[best_idx]
+    grasp_world = ext @ best_T
+    print("grasp world pos", grasp_world[:3, 3])
+    print("grasp world rot", grasp_world[:3, :3])
+
+# Code block 2
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+print("num masks", len(masks))
+# filter by score and reasonable box size
+cands = []
+for m in masks:
+    box = m.get("box")
+    if box is None:
+        continue
+    x1, y1, x2, y2 = box
+    w = x2 - x1
+    h = y2 - y1
+    if w <= 0 or h <= 0:
+        continue
+    area = w * h
+    # cube should be a modest region, not the whole image
+    if area < 200 or area > 0.25 * rgb.shape[0] * rgb.shape[1]:
+        continue
+    cands.append((m["score"], area, m))
+print("num candidates", len(cands))
+for s, a, m in sorted(cands, key=lambda t: -t[0])[:5]:
+    print("score", s, "area", a, "box", m.get("box"))
+
+# Code block 3
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Try multiple prompts to find the red cube
+for prompt in ["red cube", "cube", "red block", "block", "red object"]:
+    masks = segment_sam3_text_prompt(rgb, text_prompt=prompt)
+    print("prompt:", prompt, "num masks:", len(masks))
+    if len(masks) > 0:
+        # print top few by score
+        sorted_m = sorted(masks, key=lambda d: -d["score"])[:3]
+        for m in sorted_m:
+            print("  score", m["score"], "box", m.get("box"))
+
+# Code block 4
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Find red pixels directly via color thresholding
+r = rgb[:,:,0].astype(np.int32)
+g = rgb[:,:,1].astype(np.int32)
+b = rgb[:,:,2].astype(np.int32)
+red_mask = (r > 100) & (r > g + 50) & (r > b + 50)
+print("red pixel count", int(red_mask.sum()))
+
+if red_mask.sum() > 50:
+    ys, xs = np.where(red_mask)
+    print("red bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
+    # Build segmentation map
+    seg = red_mask.astype(np.int32)
+    grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=seg)
+    print("num grasps", len(grasp_scores))
+    if len(grasp_scores) > 0:
+        best_idx = int(grasp_scores.argmax())
+        best_T = grasp_poses[best_idx]
+        grasp_world = ext @ best_T
+        print("grasp world pos", grasp_world[:3, 3])
+        quat = np.array([1.0, 0.0, 0.0, 0.0])
+        target = grasp_world[:3, 3].copy()
+        target[2] += 0.1
+        joints = solve_ik(target, quat)
+        move_to_joints(joints)
+        open_gripper()
+        target2 = grasp_world[:3, 3].copy()
+        joints2 = solve_ik(target2, quat)
+        move_to_joints(joints2)
+        close_gripper()
+        target3 = target2.copy()
+        target3[2] += 0.15
+        joints3 = solve_ik(target3, quat)
+        move_to_joints(joints3)
+        print("done")
+
+# Code block 5
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Inspect color statistics to understand scene
+print("rgb shape", rgb.shape)
+print("rgb mean", rgb.reshape(-1,3).mean(axis=0))
+print("rgb max", rgb.reshape(-1,3).max(axis=0))
+# Find most saturated/reddish pixels
+r = rgb[:,:,0].astype(np.int32)
+g = rgb[:,:,1].astype(np.int32)
+b = rgb[:,:,2].astype(np.int32)
+redness = r - np.maximum(g, b)
+print("max redness", int(redness.max()))
+ys, xs = np.where(redness > 30)
+print("reddish count", len(xs))
+if len(xs) > 0:
+    print("reddish bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
+    # sample some colors
+    idx = np.random.choice(len(xs), min(10, len(xs)), replace=False)
+    for i in idx:
+        print("pixel", xs[i], ys[i], "rgb", rgb[ys[i], xs[i]])
+```
+
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Try point prompt at center of image and various points to find cube
+h, w = rgb.shape[:2]
+# Try segmenting with point prompts on a grid
+found = None
+for py in range(h//4, 3*h//4, h//8):
+    for px in range(w//4, 3*w//4, w//8):
+        res = segment_sam3_point_prompt(rgb, (float(px), float(py)))
+        if len(res) > 0:
+            best = max(res, key=lambda d: d["score"])
+            m = best["mask"]
+            area = int(m.sum())
+            if 100 < area < 0.2*h*w:
+                print("point", px, py, "score", best["score"], "area", area)
+                found = (px, py, best)
+                break
+    if found:
+        break
+print("found", found is not None)
+```
+
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Use point prompt at image center to get the object in front
+h, w = rgb.shape[:2]
+res = segment_sam3_point_prompt(rgb, (float(w//2), float(h//2)))
+print("num results", len(res))
+if len(res) > 0:
+    best = max(res, key=lambda d: d["score"])
+    mask = best["mask"].astype(np.int32)
+    print("score", best["score"], "area", int(mask.sum()))
+    ys, xs = np.where(mask)
+    print("bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
+    # get 3D points
+    d = depth[mask]
+    valid = d > 0
+    if valid.sum() > 10:
+        ys2, xs2 = np.where(mask)
+        zs = depth[ys2, xs2]
+        v = zs > 0
+        xs2, ys2, zs = xs2[v], ys2[v], zs[v]
+        fx, fy = K[0,0], K[1,1]
+        cx, cy = K[0,2], K[1,2]
+        X = (xs2 - cx) * zs / fx
+        Y = (ys2 - cy) * zs / fy
+        Z = zs
+        pts_cam = np.stack([X, Y, Z], axis=1)
+        # transform to world
+        pts_h = np.concatenate([pts_cam, np.ones((len(pts_cam),1))], axis=1)
+        pts_world = (ext @ pts_h.T).T[:, :3]
+        print("world center", pts_world.mean(axis=0))
+        print("world min", pts_world.min(axis=0))
+        print("world max", pts_world.max(axis=0))
+```
+
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+h, w = rgb.shape[:2]
+res = segment_sam3_point_prompt(rgb, (float(w//2), float(h//2)))
+best = max(res, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+print("num grasps", len(grasp_scores))
+if len(grasp_scores) > 0:
+    best_idx = int(grasp_scores.argmax())
+    best_T = grasp_poses[best_idx]
+    grasp_world = ext @ best_T
+    print("grasp world pos", grasp_world[:3, 3])
+    print("grasp world rot", grasp_world[:3, :3])
+    # Use grasp orientation
+    from scipy.spatial.transform import Rotation as R
+    rot = grasp_world[:3, :3]
+    quat_xyzw = R.from_matrix(rot).as_quat()
+    quat = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+    target = grasp_world[:3, 3].copy()
+    target[2] += 0.1
+    joints = solve_ik(target, quat)
+    move_to_joints(joints)
+    open_gripper()
+    target2 = grasp_world[:3, 3].copy()
+    joints2 = solve_ik(target2, quat)
+    move_to_joints(joints2)
+    close_gripper()
+    target3 = target2.copy()
+    target3[2] += 0.15
+    joints3 = solve_ik(target3, quat)
+    move_to_joints(joints3)
+    print("done")
+
+# Code block 6
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+h, w = rgb.shape[:2]
+print("image size", h, w)
+
+# Find red pixels directly
+r = rgb[:,:,0].astype(np.int32)
+g = rgb[:,:,1].astype(np.int32)
+b = rgb[:,:,2].astype(np.int32)
+red_mask = (r > 100) & (r > g + 40) & (r > b + 40)
+print("red pixel count", int(red_mask.sum()))
+
+if red_mask.sum() > 50:
+    ys, xs = np.where(red_mask)
+    print("red bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
+    seg = red_mask.astype(np.int32)
+    grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=seg)
+    print("num grasps", len(grasp_scores))
+    if len(grasp_scores) > 0:
+        best_idx = int(grasp_scores.argmax())
+        best_T = grasp_poses[best_idx]
+        grasp_world = ext @ best_T
+        print("grasp world pos", grasp_world[:3, 3])
+        from scipy.spatial.transform import Rotation as R
+        rot = grasp_world[:3, :3]
+        quat_xyzw = R.from_matrix(rot).as_quat()
+        quat = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+        target = grasp_world[:3, 3].copy()
+        target[2] += 0.1
+        joints = solve_ik(target, quat)
+        move_to_joints(joints)
+        open_gripper()
+        target2 = grasp_world[:3, 3].copy()
+        joints2 = solve_ik(target2, quat)
+        move_to_joints(joints2)
+        close_gripper()
+        target3 = target2.copy()
+        target3[2] += 0.15
+        joints3 = solve_ik(target3, quat)
+        move_to_joints(joints3)
+        print("done")
+    else:
+        print("no grasps planned")
+else:
+    print("no red pixels found")
+
+# Code block 7
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Inspect the scene: color stats and depth range
+print("rgb shape", rgb.shape)
+print("rgb mean", rgb.reshape(-1,3).mean(axis=0))
+print("rgb min", rgb.reshape(-1,3).min(axis=0))
+print("rgb max", rgb.reshape(-1,3).max(axis=0))
+print("depth min/max/mean", float(depth.min()), float(depth.max()), float(depth.mean()))
+print("depth valid count", int((depth>0).sum()))
+
+# Find the most colorful (saturated) pixels - cube likely colored
+r = rgb[:,:,0].astype(np.int32)
+g = rgb[:,:,1].astype(np.int32)
+b = rgb[:,:,2].astype(np.int32)
+mx = np.maximum(np.maximum(r,g),b)
+mn = np.minimum(np.minimum(r,g),b)
+sat = mx - mn
+print("max saturation", int(sat.max()))
+ys, xs = np.where(sat > 60)
+print("saturated count", len(xs))
+if len(xs) > 0:
+    print("sat bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
+    idx = np.random.choice(len(xs), min(10, len(xs)), replace=False)
+    for i in idx:
+        print("pixel", xs[i], ys[i], "rgb", rgb[ys[i], xs[i]])
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: rgb shape (512, 512, 3)
+rgb mean [207.69848251 206.54349518 202.78154373]
+rgb min [8 8 8]
+rgb max [255 255 255]
+depth min/max/mean 0.47798532247543335 2.6457858085632324 0.8843650817871094
+depth valid count 262144
+max saturation 41
+saturated count 0
+
+  Stderr: Traceback (most recent call last):
+  File "/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py", line 196, in _exec_user_code
+    exec(code, self._exec_globals, self._exec_globals)
+  File "<string>", line 27
+    ```
+    ^
+SyntaxError: invalid syntax
+
+  Reward: 0.7019699317876993
+  Task Completed: False
+  Terminated: False, Truncated: False
+  Num Regenerations: 7
+  Num Finishes: 0
+  Num Code Blocks: 8
+----------------------------------------------------------------------------------------------------
+Code saved to logs/test_eval/cube_lifting/baseline/seed_111/trial_111_sandboxrc_0_reward_0.702_taskcompleted_0/code.py
+
+Summary Statistics:
+Model: deepseek-v4.1-flash-1017
+Visual Differencing Model: qwen3.8-flash
+Config Path: env_configs/harness_eval/cube_lifting.yaml
+Git Commit: ed29cc7 (Dirty: True)
+Total number of trials: 1
+Code generation success rate / Average reward / Task completed: 
+1.000/0.702/0
+Average code blocks: 8.000
+Average regenerations: 7.000
+Average finishes: 0.000
+Elapsed time: 128.05 seconds

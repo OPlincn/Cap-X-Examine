@@ -1,0 +1,245 @@
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+print("rgb", rgb.shape, "depth", depth.shape)
+print("K", K)
+print("ext", ext)
+```
+I'll segment the red cube and plan a grasp.
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+res = segment_sam3_text_prompt(rgb, "red cube")
+print("num masks", len(res))
+for r in res:
+    print(r.get("score"), r.get("box"))
+best = max(res, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+print("mask sum", mask.sum())
+
+poses, scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+print("poses", poses.shape, "scores", scores.shape)
+idx = int(np.argmax(scores))
+T_cam = poses[idx]
+print("best score", scores[idx])
+T_world = ext @ T_cam
+print("T_world\n", T_world)
+```
+Now I'll move to a pre-grasp pose above the cube, then approach and grasp.
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+res = segment_sam3_text_prompt(rgb, "red cube")
+best = max(res, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+poses, scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+idx = int(np.argmax(scores))
+T_world = ext @ poses[idx]
+
+pos = T_world[:3, 3]
+R = T_world[:3, :3]
+# Build quaternion from rotation matrix (wxyz)
+def rot_to_quat(R):
+    t = np.trace(R)
+    if t > 0:
+        s = np.sqrt(t + 1.0) * 2
+        w = 0.25 * s
+        x = (R[2,1]-R[1,2])/s
+        y = (R[0,2]-R[2,0])/s
+        z = (R[1,0]-R[0,1])/s
+    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:
+        s = np.sqrt(1.0+R[0,0]-R[1,1]-R[2,2])*2
+        w = (R[2,1]-R[1,2])/s
+        x = 0.25*s
+        y = (R[0,1]+R[1,0])/s
+        z = (R[0,2]+R[2,0])/s
+    elif R[1,1] > R[2,2]:
+        s = np.sqrt(1.0+R[1,1]-R[0,0]-R[2,2])*2
+        w = (R[0,2]-R[2,0])/s
+        x = (R[0,1]+R[1,0])/s
+        y = 0.25*s
+        z = (R[1,2]+R[2,1])/s
+    else:
+        s = np.sqrt(1.0+R[2,2]-R[0,0]-R[1,1])*2
+        w = (R[1,0]-R[0,1])/s
+        x = (R[0,2]+R[2,0])/s
+        y = (R[1,2]+R[2,1])/s
+        z = 0.25*s
+    q = np.array([w,x,y,z])
+    return q/np.linalg.norm(q)
+
+quat = rot_to_quat(R)
+print("grasp pos", pos, "quat", quat)
+
+# pre-grasp above
+pre = pos.copy()
+pre[2] += 0.10
+open_gripper()
+j = solve_ik(pre, quat)
+move_to_joints(j)
+print("moved to pre-grasp")
+```
+Now approach down to the grasp pose and close the gripper.
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+res = segment_sam3_text_prompt(rgb, "red cube")
+best = max(res, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+poses, scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+idx = int(np.argmax(scores))
+T_world = ext @ poses[idx]
+pos = T_world[:3, 3]
+R = T_world[:3, :3]
+
+def rot_to_quat(R):
+    t = np.trace(R)
+    if t > 0:
+        s = np.sqrt(t + 1.0) * 2
+        w = 0.25 * s; x = (R[2,1]-R[1,2])/s; y = (R[0,2]-R[2,0])/s; z = (R[1,0]-R[0,1])/s
+    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:
+        s = np.sqrt(1.0+R[0,0]-R[1,1]-R[2,2])*2
+        w = (R[2,1]-R[1,2])/s; x = 0.25*s; y = (R[0,1]+R[1,0])/s; z = (R[0,2]+R[2,0])/s
+    elif R[1,1] > R[2,2]:
+        s = np.sqrt(1.0+R[1,1]-R[0,0]-R[2,2])*2
+        w = (R[0,2]-R[2,0])/s; x = (R[0,1]+R[1,0])/s; y = 0.25*s; z = (R[1,2]+R[2,1])/s
+    else:
+        s = np.sqrt(1.0+R[2,2]-R[0,0]-R[1,1])*2
+        w = (R[1,0]-R[0,1])/s; x = (R[0,2]+R[2,0])/s; y = (R[1,2]+R[2,1])/s; z = 0.25*s
+    q = np.array([w,x,y,z]); return q/np.linalg.norm(q)
+
+quat = rot_to_quat(R)
+# approach slightly above grasp then descend
+approach = pos.copy(); approach[2] += 0.02
+j = solve_ik(approach, quat)
+move_to_joints(j)
+j = solve_ik(pos, quat)
+move_to_joints(j)
+close_gripper()
+print("grasped")
+```
+Now lift the cube.
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+res = segment_sam3_text_prompt(rgb, "red cube")
+best = max(res, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+poses, scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+idx = int(np.argmax(scores))
+T_world = ext @ poses[idx]
+pos = T_world[:3, 3]
+R = T_world[:3, :3]
+
+def rot_to_quat(R):
+    t = np.trace(R)
+    if t > 0:
+        s = np.sqrt(t + 1.0) * 2
+        w = 0.25 * s; x = (R[2,1]-R[1,2])/s; y = (R[0,2]-R[2,0])/s; z = (R[1,0]-R[0,1])/s
+    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:
+        s = np.sqrt(1.0+R[0,0]-R[1,1]-R[2,2])*2
+        w = (R[2,1]-R[1,2])/s; x = 0.25*s; y = (R[0,1]+R[1,0])/s; z = (R[0,2]+R[2,0])/s
+    elif R[1,1] > R[2,2]:
+        s = np.sqrt(1.0+R[1,1]-R[0,0]-R[2,2])*2
+        w = (R[0,2]-R[2,0])/s; x = (R[0,1]+R[1,0])/s; y = 0.25*s; z = (R[1,2]+R[2,1])/s
+    else:
+        s = np.sqrt(1.0+R[2,2]-R[0,0]-R[1,1])*2
+        w = (R[1,0]-R[0,1])/s; x = (R[0,2]+R[2,0])/s; y = (R[1,2]+R[2,1])/s; z = 0.25*s
+    q = np.array([w,x,y,z]); return q/np.linalg.norm(q)
+
+quat = rot_to_quat(R)
+lift = pos.copy(); lift[2] += 0.15
+j = solve_ik(lift, quat)
+move_to_joints(j)
+print("lifted")
+
+# Code block 1
+import numpy as np
+
+def rot_to_quat(R):
+    t = np.trace(R)
+    if t > 0:
+        s = np.sqrt(t + 1.0) * 2
+        w = 0.25 * s; x = (R[2,1]-R[1,2])/s; y = (R[0,2]-R[2,0])/s; z = (R[1,0]-R[0,1])/s
+    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:
+        s = np.sqrt(1.0+R[0,0]-R[1,1]-R[2,2])*2
+        w = (R[2,1]-R[1,2])/s; x = 0.25*s; y = (R[0,1]+R[1,0])/s; z = (R[0,2]+R[2,0])/s
+    elif R[1,1] > R[2,2]:
+        s = np.sqrt(1.0+R[1,1]-R[0,0]-R[2,2])*2
+        w = (R[0,2]-R[2,0])/s; x = (R[0,1]+R[1,0])/s; y = 0.25*s; z = (R[1,2]+R[2,1])/s
+    else:
+        s = np.sqrt(1.0+R[2,2]-R[0,0]-R[1,1])*2
+        w = (R[1,0]-R[0,1])/s; x = (R[0,2]+R[2,0])/s; y = (R[1,2]+R[2,1])/s; z = 0.25*s
+    q = np.array([w,x,y,z]); return q/np.linalg.norm(q)
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+res = segment_sam3_text_prompt(rgb, "red cube")
+print("num masks", len(res))
+best = max(res, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+print("mask sum", mask.sum())
+
+poses, scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+print("poses", poses.shape, "scores", scores.shape)
+idx = int(np.argmax(scores))
+T_world = ext @ poses[idx]
+pos = T_world[:3, 3]
+R = T_world[:3, :3]
+quat = rot_to_quat(R)
+print("grasp pos", pos, "quat", quat)
+
+pre = pos.copy(); pre[2] += 0.10
+open_gripper()
+j = solve_ik(pre, quat)
+move_to_joints(j)
+print("moved to pre-grasp")
+
+approach = pos.copy(); approach[2] += 0.02
+j = solve_ik(approach, quat)
+move_to_joints(j)
+j = solve_ik(pos, quat)
+move_to_joints(j)
+close_gripper()
+print("grasped")
+
+lift = pos.copy(); lift[2] += 0.15
+j = solve_ik(lift, quat)
+move_to_joints(j)
+print("lifted")

@@ -1,0 +1,11 @@
+Model: deepseek-v4.1-flash-1017
+Visual Differencing Model: qwen3.8-flash
+Config Path: env_configs/harness_eval/cube_stack.yaml
+Git Commit: ed29cc7 (Dirty: True)
+Total number of trials: 1
+Code generation success rate / Average reward / Task completed: 
+1.000/1.000/1
+Average code blocks: 2.000
+Average regenerations: 1.000
+Average finishes: 1.000
+Elapsed time: 63.78 seconds

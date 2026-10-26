@@ -1,0 +1,115 @@
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python /home/oplin/PythonProjects/cap-task/cap-x/capx/third_party/robosuite/robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:32)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly, otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:42)
+R1Pro not installed, skipping R1Pro APIs
+LIBERO not installed!
+R1Pro not installed!
+API server on 127.0.0.1:8114 already running, skipping
+API server on 127.0.0.1:8115 already running, skipping
+API server on 127.0.0.1:8116 already running, skipping
+[robosuite INFO] Loading controller configuration from: capx/integrations/robosuite/controllers/config/robots/panda_joint_ctrl.json (composite_controller_factory.py:121)
+init franka control api
+init grasp net plan fn
+init sam3 seg fn
+Running Trials:   0%|          | 0/1 [00:00<?, ?it/s]Time taken to query model: 8.04 seconds
+Time taken to query model: 4.48 seconds
+cube center world: [ 0.54623134 -0.0091065  -0.09004388]
+grasp world pos: [ 0.5479531  -0.00744041 -0.09770972]
+grasp score: 0.28858742
+done
+Time taken to query model: 9.29 seconds
+Time taken to query model: 1.08 seconds
+Model chose to finish
+Code blocks done
+Saved interaction video to logs/test_eval/cube_lifting/ablation/seed_102/trial_102_sandboxrc_0_reward_1.000_taskcompleted_1/video_turn_00.mp4 (78 frames)
+Saved interaction video to logs/test_eval/cube_lifting/ablation/seed_102/trial_102_sandboxrc_0_reward_1.000_taskcompleted_1/video_combined.mp4 (79 frames)
+Trial 102 took 29.21 seconds
+Running Trials: 100%|██████████| 1/1 [00:29<00:00, 29.35s/it]Running Trials: 100%|██████████| 1/1 [00:29<00:00, 29.35s/it]
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasp_poses[best_idx]
+grasp_world = ext @ best_T
+
+# compute cube center in world from mask points
+ys, xs = np.where(mask)
+z = depth[ys, xs]
+fx, fy = K[0,0], K[1,1]
+cx, cy = K[0,2], K[1,2]
+X = (xs - cx) * z / fx
+Y = (ys - cy) * z / fy
+pts_cam = np.stack([X, Y, z, np.ones_like(z)], axis=1)
+pts_world = (ext @ pts_cam.T).T[:, :3]
+center = pts_world.mean(axis=0)
+print("cube center world:", center)
+print("grasp world pos:", grasp_world[:3,3])
+print("grasp score:", grasp_scores[best_idx])
+
+# approach from above
+target_pos = grasp_world[:3,3].copy()
+target_pos[2] = center[2] + 0.10
+quat = np.array([0.0, 1.0, 0.0, 0.0])  # gripper pointing down
+open_gripper()
+joints = solve_ik(target_pos, quat)
+move_to_joints(joints)
+
+# descend to grasp
+target_pos[2] = center[2] + 0.005
+joints = solve_ik(target_pos, quat)
+move_to_joints(joints)
+
+close_gripper()
+
+# lift
+lift_pos = target_pos.copy()
+lift_pos[2] += 0.15
+joints = solve_ik(lift_pos, quat)
+move_to_joints(joints)
+print("done")
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: cube center world: [ 0.54623134 -0.0091065  -0.09004388]
+grasp world pos: [ 0.5479531  -0.00744041 -0.09770972]
+grasp score: 0.28858742
+done
+
+  Stderr: 
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 0
+  Num Finishes: 1
+  Num Code Blocks: 1
+----------------------------------------------------------------------------------------------------
+Code saved to logs/test_eval/cube_lifting/ablation/seed_102/trial_102_sandboxrc_0_reward_1.000_taskcompleted_1/code.py
+
+Summary Statistics:
+Model: deepseek-v4.1-flash-1017
+Visual Differencing Model: qwen3.8-flash
+Config Path: env_configs/harness_eval/cube_lifting.yaml
+Git Commit: ed29cc7 (Dirty: True)
+Total number of trials: 1
+Code generation success rate / Average reward / Task completed: 
+1.000/1.000/1
+Average code blocks: 1.000
+Average regenerations: 0.000
+Average finishes: 1.000
+Elapsed time: 30.32 seconds

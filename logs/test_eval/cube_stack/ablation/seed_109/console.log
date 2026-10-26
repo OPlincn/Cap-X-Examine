@@ -1,0 +1,179 @@
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python /home/oplin/PythonProjects/cap-task/cap-x/capx/third_party/robosuite/robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:32)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly, otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:42)
+R1Pro not installed, skipping R1Pro APIs
+LIBERO not installed!
+R1Pro not installed!
+API server on 127.0.0.1:8114 already running, skipping
+API server on 127.0.0.1:8115 already running, skipping
+API server on 127.0.0.1:8116 already running, skipping
+[robosuite INFO] Loading controller configuration from: capx/integrations/robosuite/controllers/config/robots/panda_joint_ctrl.json (composite_controller_factory.py:121)
+init franka control api
+init grasp net plan fn
+init sam3 seg fn
+Running Trials:   0%|          | 0/1 [00:00<?, ?it/s]Time taken to query model: 7.80 seconds
+Time taken to query model: 10.68 seconds
+Time taken to query model: 11.55 seconds
+Time taken to query model: 1.28 seconds
+Model chose to finish
+Code blocks done
+Saved interaction video to logs/test_eval/cube_stack/ablation/seed_109/trial_109_sandboxrc_0_reward_1.000_taskcompleted_1/video_turn_00.mp4 (43 frames)
+Saved interaction video to logs/test_eval/cube_stack/ablation/seed_109/trial_109_sandboxrc_0_reward_1.000_taskcompleted_1/video_combined.mp4 (44 frames)
+Trial 109 took 39.54 seconds
+Running Trials: 100%|██████████| 1/1 [00:39<00:00, 39.69s/it]Running Trials: 100%|██████████| 1/1 [00:39<00:00, 39.69s/it]
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+# Segment red and green cubes
+red_res = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+green_res = segment_sam3_text_prompt(rgb, text_prompt="green cube")
+
+red_best = max(red_res, key=lambda d: d["score"])
+green_best = max(green_res, key=lambda d: d["score"])
+red_mask = red_best["mask"]
+green_mask = green_best["mask"]
+
+def mask_to_world_points(mask, depth, K, cam_pose):
+    ys, xs = np.where(mask)
+    zs = depth[ys, xs]
+    valid = zs > 0
+    xs, ys, zs = xs[valid], ys[valid], zs[valid]
+    fx, fy = K[0, 0], K[1, 1]
+    cx, cy = K[0, 2], K[1, 2]
+    x_cam = (xs - cx) * zs / fx
+    y_cam = (ys - cy) * zs / fy
+    pts_cam = np.stack([x_cam, y_cam, zs], axis=1)
+    pts_h = np.concatenate([pts_cam, np.ones((pts_cam.shape[0], 1))], axis=1)
+    pts_world = (cam_pose @ pts_h.T).T[:, :3]
+    return pts_world
+
+red_pts = mask_to_world_points(red_mask, depth, K, cam_pose)
+green_pts = mask_to_world_points(green_mask, depth, K, cam_pose)
+
+red_obb = get_oriented_bounding_box_from_3d_points(red_pts)
+green_obb = get_oriented_bounding_box_from_3d_points(green_pts)
+
+red_center = red_obb["center"]
+green_center = green_obb["center"]
+green_extent = green_obb["extent"]
+red_extent = red_obb["extent"]
+
+# Top of green cube
+green_top_z = green_center[2] + green_extent[2] / 2.0
+red_half_height = red_extent[2] / 2.0
+place_z = green_top_z + red_half_height + 0.005
+
+# Grasp the red cube from above
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=red_mask.astype(np.int32))
+best_idx = grasp_scores.argmax()
+best_T_cam = grasp_poses[best_idx]
+best_T_world = cam_pose @ best_T_cam
+
+grasp_pos = best_T_world[:3, 3]
+grasp_quat = None
+# Convert rotation to quaternion wxyz
+R = best_T_world[:3, :3]
+def rot_to_quat(R):
+    tr = R[0,0] + R[1,1] + R[2,2]
+    if tr > 0:
+        S = np.sqrt(tr + 1.0) * 2
+        w = 0.25 * S
+        x = (R[2,1] - R[1,2]) / S
+        y = (R[0,2] - R[2,0]) / S
+        z = (R[1,0] - R[0,1]) / S
+    elif (R[0,0] > R[1,1]) and (R[0,0] > R[2,2]):
+        S = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+        w = (R[2,1] - R[1,2]) / S
+        x = 0.25 * S
+        y = (R[0,1] + R[1,0]) / S
+        z = (R[0,2] + R[2,0]) / S
+    elif R[1,1] > R[2,2]:
+        S = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+        w = (R[0,2] - R[2,0]) / S
+        x = (R[0,1] + R[1,0]) / S
+        y = 0.25 * S
+        z = (R[1,2] + R[2,1]) / S
+    else:
+        S = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+        w = (R[1,0] - R[0,1]) / S
+        x = (R[0,2] + R[2,0]) / S
+        y = (R[1,2] + R[2,1]) / S
+        z = 0.25 * S
+    return np.array([w, x, y, z])
+
+grasp_quat = rot_to_quat(R)
+
+# Approach from above: pre-grasp position
+pre_grasp_pos = grasp_pos.copy()
+pre_grasp_pos[2] += 0.10
+
+open_gripper()
+joints = solve_ik(pre_grasp_pos, grasp_quat)
+move_to_joints(joints)
+
+joints = solve_ik(grasp_pos, grasp_quat)
+move_to_joints(joints)
+
+close_gripper()
+
+# Lift
+lift_pos = grasp_pos.copy()
+lift_pos[2] += 0.15
+joints = solve_ik(lift_pos, grasp_quat)
+move_to_joints(joints)
+
+# Move above green cube
+place_pos = np.array([green_center[0], green_center[1], place_z + 0.10])
+joints = solve_ik(place_pos, grasp_quat)
+move_to_joints(joints)
+
+# Lower to place
+place_final = np.array([green_center[0], green_center[1], place_z])
+joints = solve_ik(place_final, grasp_quat)
+move_to_joints(joints)
+
+open_gripper()
+
+# Retreat upward
+retreat_pos = place_final.copy()
+retreat_pos[2] += 0.15
+joints = solve_ik(retreat_pos, grasp_quat)
+move_to_joints(joints)
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: 
+  Stderr: 
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 0
+  Num Finishes: 1
+  Num Code Blocks: 1
+----------------------------------------------------------------------------------------------------
+Code saved to logs/test_eval/cube_stack/ablation/seed_109/trial_109_sandboxrc_0_reward_1.000_taskcompleted_1/code.py
+
+Summary Statistics:
+Model: deepseek-v4.1-flash-1017
+Visual Differencing Model: qwen3.8-flash
+Config Path: env_configs/harness_eval/cube_stack.yaml
+Git Commit: ed29cc7 (Dirty: True)
+Total number of trials: 1
+Code generation success rate / Average reward / Task completed: 
+1.000/1.000/1
+Average code blocks: 1.000
+Average regenerations: 0.000
+Average finishes: 1.000
+Elapsed time: 40.67 seconds

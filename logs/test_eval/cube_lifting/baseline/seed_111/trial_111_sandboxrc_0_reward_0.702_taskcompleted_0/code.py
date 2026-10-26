@@ -1,0 +1,385 @@
+# Code block 0
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(grasp_scores.argmax())
+best_T = grasp_poses[best_idx]
+grasp_world = ext @ best_T
+
+pos = grasp_world[:3, :3]
+# approach from above: use grasp orientation but position above
+quat = np.array([1.0, 0.0, 0.0, 0.0])
+target = grasp_world[:3, 3].copy()
+target[2] += 0.1
+joints = solve_ik(target, quat)
+move_to_joints(joints)
+open_gripper()
+
+# move down to grasp
+target2 = grasp_world[:3, 3].copy()
+joints2 = solve_ik(target2, quat)
+move_to_joints(joints2)
+close_gripper()
+
+# lift
+target3 = target2.copy()
+target3[2] += 0.15
+joints3 = solve_ik(target3, quat)
+move_to_joints(joints3)
+print("done", grasp_world[:3,3])
+
+# Code block 1
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+print("num masks", len(masks))
+if len(masks) == 0:
+    print("no cube found")
+else:
+    best = max(masks, key=lambda d: d["score"])
+    mask = best["mask"].astype(np.int32)
+    print("mask score", best["score"], "box", best.get("box"))
+    grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+    print("num grasps", len(grasp_scores))
+    best_idx = int(grasp_scores.argmax())
+    best_T = grasp_poses[best_idx]
+    grasp_world = ext @ best_T
+    print("grasp world pos", grasp_world[:3, 3])
+    print("grasp world rot", grasp_world[:3, :3])
+
+# Code block 2
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+print("num masks", len(masks))
+# filter by score and reasonable box size
+cands = []
+for m in masks:
+    box = m.get("box")
+    if box is None:
+        continue
+    x1, y1, x2, y2 = box
+    w = x2 - x1
+    h = y2 - y1
+    if w <= 0 or h <= 0:
+        continue
+    area = w * h
+    # cube should be a modest region, not the whole image
+    if area < 200 or area > 0.25 * rgb.shape[0] * rgb.shape[1]:
+        continue
+    cands.append((m["score"], area, m))
+print("num candidates", len(cands))
+for s, a, m in sorted(cands, key=lambda t: -t[0])[:5]:
+    print("score", s, "area", a, "box", m.get("box"))
+
+# Code block 3
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Try multiple prompts to find the red cube
+for prompt in ["red cube", "cube", "red block", "block", "red object"]:
+    masks = segment_sam3_text_prompt(rgb, text_prompt=prompt)
+    print("prompt:", prompt, "num masks:", len(masks))
+    if len(masks) > 0:
+        # print top few by score
+        sorted_m = sorted(masks, key=lambda d: -d["score"])[:3]
+        for m in sorted_m:
+            print("  score", m["score"], "box", m.get("box"))
+
+# Code block 4
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Find red pixels directly via color thresholding
+r = rgb[:,:,0].astype(np.int32)
+g = rgb[:,:,1].astype(np.int32)
+b = rgb[:,:,2].astype(np.int32)
+red_mask = (r > 100) & (r > g + 50) & (r > b + 50)
+print("red pixel count", int(red_mask.sum()))
+
+if red_mask.sum() > 50:
+    ys, xs = np.where(red_mask)
+    print("red bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
+    # Build segmentation map
+    seg = red_mask.astype(np.int32)
+    grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=seg)
+    print("num grasps", len(grasp_scores))
+    if len(grasp_scores) > 0:
+        best_idx = int(grasp_scores.argmax())
+        best_T = grasp_poses[best_idx]
+        grasp_world = ext @ best_T
+        print("grasp world pos", grasp_world[:3, 3])
+        quat = np.array([1.0, 0.0, 0.0, 0.0])
+        target = grasp_world[:3, 3].copy()
+        target[2] += 0.1
+        joints = solve_ik(target, quat)
+        move_to_joints(joints)
+        open_gripper()
+        target2 = grasp_world[:3, 3].copy()
+        joints2 = solve_ik(target2, quat)
+        move_to_joints(joints2)
+        close_gripper()
+        target3 = target2.copy()
+        target3[2] += 0.15
+        joints3 = solve_ik(target3, quat)
+        move_to_joints(joints3)
+        print("done")
+
+# Code block 5
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Inspect color statistics to understand scene
+print("rgb shape", rgb.shape)
+print("rgb mean", rgb.reshape(-1,3).mean(axis=0))
+print("rgb max", rgb.reshape(-1,3).max(axis=0))
+# Find most saturated/reddish pixels
+r = rgb[:,:,0].astype(np.int32)
+g = rgb[:,:,1].astype(np.int32)
+b = rgb[:,:,2].astype(np.int32)
+redness = r - np.maximum(g, b)
+print("max redness", int(redness.max()))
+ys, xs = np.where(redness > 30)
+print("reddish count", len(xs))
+if len(xs) > 0:
+    print("reddish bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
+    # sample some colors
+    idx = np.random.choice(len(xs), min(10, len(xs)), replace=False)
+    for i in idx:
+        print("pixel", xs[i], ys[i], "rgb", rgb[ys[i], xs[i]])
+```
+
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Try point prompt at center of image and various points to find cube
+h, w = rgb.shape[:2]
+# Try segmenting with point prompts on a grid
+found = None
+for py in range(h//4, 3*h//4, h//8):
+    for px in range(w//4, 3*w//4, w//8):
+        res = segment_sam3_point_prompt(rgb, (float(px), float(py)))
+        if len(res) > 0:
+            best = max(res, key=lambda d: d["score"])
+            m = best["mask"]
+            area = int(m.sum())
+            if 100 < area < 0.2*h*w:
+                print("point", px, py, "score", best["score"], "area", area)
+                found = (px, py, best)
+                break
+    if found:
+        break
+print("found", found is not None)
+```
+
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Use point prompt at image center to get the object in front
+h, w = rgb.shape[:2]
+res = segment_sam3_point_prompt(rgb, (float(w//2), float(h//2)))
+print("num results", len(res))
+if len(res) > 0:
+    best = max(res, key=lambda d: d["score"])
+    mask = best["mask"].astype(np.int32)
+    print("score", best["score"], "area", int(mask.sum()))
+    ys, xs = np.where(mask)
+    print("bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
+    # get 3D points
+    d = depth[mask]
+    valid = d > 0
+    if valid.sum() > 10:
+        ys2, xs2 = np.where(mask)
+        zs = depth[ys2, xs2]
+        v = zs > 0
+        xs2, ys2, zs = xs2[v], ys2[v], zs[v]
+        fx, fy = K[0,0], K[1,1]
+        cx, cy = K[0,2], K[1,2]
+        X = (xs2 - cx) * zs / fx
+        Y = (ys2 - cy) * zs / fy
+        Z = zs
+        pts_cam = np.stack([X, Y, Z], axis=1)
+        # transform to world
+        pts_h = np.concatenate([pts_cam, np.ones((len(pts_cam),1))], axis=1)
+        pts_world = (ext @ pts_h.T).T[:, :3]
+        print("world center", pts_world.mean(axis=0))
+        print("world min", pts_world.min(axis=0))
+        print("world max", pts_world.max(axis=0))
+```
+
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+h, w = rgb.shape[:2]
+res = segment_sam3_point_prompt(rgb, (float(w//2), float(h//2)))
+best = max(res, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+print("num grasps", len(grasp_scores))
+if len(grasp_scores) > 0:
+    best_idx = int(grasp_scores.argmax())
+    best_T = grasp_poses[best_idx]
+    grasp_world = ext @ best_T
+    print("grasp world pos", grasp_world[:3, 3])
+    print("grasp world rot", grasp_world[:3, :3])
+    # Use grasp orientation
+    from scipy.spatial.transform import Rotation as R
+    rot = grasp_world[:3, :3]
+    quat_xyzw = R.from_matrix(rot).as_quat()
+    quat = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+    target = grasp_world[:3, 3].copy()
+    target[2] += 0.1
+    joints = solve_ik(target, quat)
+    move_to_joints(joints)
+    open_gripper()
+    target2 = grasp_world[:3, 3].copy()
+    joints2 = solve_ik(target2, quat)
+    move_to_joints(joints2)
+    close_gripper()
+    target3 = target2.copy()
+    target3[2] += 0.15
+    joints3 = solve_ik(target3, quat)
+    move_to_joints(joints3)
+    print("done")
+
+# Code block 6
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+h, w = rgb.shape[:2]
+print("image size", h, w)
+
+# Find red pixels directly
+r = rgb[:,:,0].astype(np.int32)
+g = rgb[:,:,1].astype(np.int32)
+b = rgb[:,:,2].astype(np.int32)
+red_mask = (r > 100) & (r > g + 40) & (r > b + 40)
+print("red pixel count", int(red_mask.sum()))
+
+if red_mask.sum() > 50:
+    ys, xs = np.where(red_mask)
+    print("red bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
+    seg = red_mask.astype(np.int32)
+    grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=seg)
+    print("num grasps", len(grasp_scores))
+    if len(grasp_scores) > 0:
+        best_idx = int(grasp_scores.argmax())
+        best_T = grasp_poses[best_idx]
+        grasp_world = ext @ best_T
+        print("grasp world pos", grasp_world[:3, 3])
+        from scipy.spatial.transform import Rotation as R
+        rot = grasp_world[:3, :3]
+        quat_xyzw = R.from_matrix(rot).as_quat()
+        quat = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+        target = grasp_world[:3, 3].copy()
+        target[2] += 0.1
+        joints = solve_ik(target, quat)
+        move_to_joints(joints)
+        open_gripper()
+        target2 = grasp_world[:3, 3].copy()
+        joints2 = solve_ik(target2, quat)
+        move_to_joints(joints2)
+        close_gripper()
+        target3 = target2.copy()
+        target3[2] += 0.15
+        joints3 = solve_ik(target3, quat)
+        move_to_joints(joints3)
+        print("done")
+    else:
+        print("no grasps planned")
+else:
+    print("no red pixels found")
+
+# Code block 7
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+# Inspect the scene: color stats and depth range
+print("rgb shape", rgb.shape)
+print("rgb mean", rgb.reshape(-1,3).mean(axis=0))
+print("rgb min", rgb.reshape(-1,3).min(axis=0))
+print("rgb max", rgb.reshape(-1,3).max(axis=0))
+print("depth min/max/mean", float(depth.min()), float(depth.max()), float(depth.mean()))
+print("depth valid count", int((depth>0).sum()))
+
+# Find the most colorful (saturated) pixels - cube likely colored
+r = rgb[:,:,0].astype(np.int32)
+g = rgb[:,:,1].astype(np.int32)
+b = rgb[:,:,2].astype(np.int32)
+mx = np.maximum(np.maximum(r,g),b)
+mn = np.minimum(np.minimum(r,g),b)
+sat = mx - mn
+print("max saturation", int(sat.max()))
+ys, xs = np.where(sat > 60)
+print("saturated count", len(xs))
+if len(xs) > 0:
+    print("sat bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
+    idx = np.random.choice(len(xs), min(10, len(xs)), replace=False)
+    for i in idx:
+        print("pixel", xs[i], ys[i], "rgb", rgb[ys[i], xs[i]])

@@ -1,0 +1,516 @@
+[run] task=cube_lifting seed=100 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_100
+[done] task=cube_lifting seed=100 mode=baseline exit=0
+[run] task=cube_lifting seed=100 mode=ours -> logs/test_eval/cube_lifting/ours/seed_100
+[done] task=cube_lifting seed=100 mode=ours exit=0
+[run] task=cube_lifting seed=100 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_100
+[done] task=cube_lifting seed=100 mode=ablation exit=0
+[run] task=cube_lifting seed=101 mode=ours -> logs/test_eval/cube_lifting/ours/seed_101
+[done] task=cube_lifting seed=101 mode=ours exit=0
+[run] task=cube_lifting seed=101 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_101
+[done] task=cube_lifting seed=101 mode=ablation exit=0
+[run] task=cube_lifting seed=101 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_101
+[done] task=cube_lifting seed=101 mode=baseline exit=0
+[run] task=cube_lifting seed=102 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_102
+[done] task=cube_lifting seed=102 mode=ablation exit=0
+[run] task=cube_lifting seed=102 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_102
+[done] task=cube_lifting seed=102 mode=baseline exit=0
+[run] task=cube_lifting seed=102 mode=ours -> logs/test_eval/cube_lifting/ours/seed_102
+[done] task=cube_lifting seed=102 mode=ours exit=0
+[run] task=cube_lifting seed=103 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_103
+[done] task=cube_lifting seed=103 mode=baseline exit=0
+[run] task=cube_lifting seed=103 mode=ours -> logs/test_eval/cube_lifting/ours/seed_103
+[done] task=cube_lifting seed=103 mode=ours exit=0
+[run] task=cube_lifting seed=103 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_103
+[done] task=cube_lifting seed=103 mode=ablation exit=0
+[run] task=cube_lifting seed=104 mode=ours -> logs/test_eval/cube_lifting/ours/seed_104
+[done] task=cube_lifting seed=104 mode=ours exit=0
+[run] task=cube_lifting seed=104 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_104
+[done] task=cube_lifting seed=104 mode=ablation exit=0
+[run] task=cube_lifting seed=104 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_104
+[done] task=cube_lifting seed=104 mode=baseline exit=0
+[run] task=cube_lifting seed=105 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_105
+[done] task=cube_lifting seed=105 mode=ablation exit=0
+[run] task=cube_lifting seed=105 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_105
+[done] task=cube_lifting seed=105 mode=baseline exit=0
+[run] task=cube_lifting seed=105 mode=ours -> logs/test_eval/cube_lifting/ours/seed_105
+[done] task=cube_lifting seed=105 mode=ours exit=0
+[run] task=cube_lifting seed=106 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_106
+[done] task=cube_lifting seed=106 mode=baseline exit=0
+[run] task=cube_lifting seed=106 mode=ours -> logs/test_eval/cube_lifting/ours/seed_106
+[done] task=cube_lifting seed=106 mode=ours exit=0
+[run] task=cube_lifting seed=106 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_106
+[done] task=cube_lifting seed=106 mode=ablation exit=0
+[run] task=cube_lifting seed=107 mode=ours -> logs/test_eval/cube_lifting/ours/seed_107
+[done] task=cube_lifting seed=107 mode=ours exit=0
+[run] task=cube_lifting seed=107 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_107
+[done] task=cube_lifting seed=107 mode=ablation exit=0
+[run] task=cube_lifting seed=107 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_107
+[done] task=cube_lifting seed=107 mode=baseline exit=0
+[run] task=cube_lifting seed=108 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_108
+[done] task=cube_lifting seed=108 mode=ablation exit=0
+[run] task=cube_lifting seed=108 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_108
+[done] task=cube_lifting seed=108 mode=baseline exit=0
+[run] task=cube_lifting seed=108 mode=ours -> logs/test_eval/cube_lifting/ours/seed_108
+[done] task=cube_lifting seed=108 mode=ours exit=0
+[run] task=cube_lifting seed=109 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_109
+[done] task=cube_lifting seed=109 mode=baseline exit=0
+[run] task=cube_lifting seed=109 mode=ours -> logs/test_eval/cube_lifting/ours/seed_109
+[done] task=cube_lifting seed=109 mode=ours exit=0
+[run] task=cube_lifting seed=109 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_109
+[done] task=cube_lifting seed=109 mode=ablation exit=0
+[run] task=cube_lifting seed=110 mode=ours -> logs/test_eval/cube_lifting/ours/seed_110
+[done] task=cube_lifting seed=110 mode=ours exit=0
+[run] task=cube_lifting seed=110 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_110
+[done] task=cube_lifting seed=110 mode=ablation exit=0
+[run] task=cube_lifting seed=110 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_110
+[done] task=cube_lifting seed=110 mode=baseline exit=0
+[run] task=cube_lifting seed=111 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_111
+[done] task=cube_lifting seed=111 mode=ablation exit=0
+[run] task=cube_lifting seed=111 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_111
+[done] task=cube_lifting seed=111 mode=baseline exit=0
+[run] task=cube_lifting seed=111 mode=ours -> logs/test_eval/cube_lifting/ours/seed_111
+[done] task=cube_lifting seed=111 mode=ours exit=0
+[run] task=cube_lifting seed=112 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_112
+[done] task=cube_lifting seed=112 mode=baseline exit=0
+[run] task=cube_lifting seed=112 mode=ours -> logs/test_eval/cube_lifting/ours/seed_112
+[done] task=cube_lifting seed=112 mode=ours exit=0
+[run] task=cube_lifting seed=112 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_112
+[done] task=cube_lifting seed=112 mode=ablation exit=0
+[run] task=cube_lifting seed=113 mode=ours -> logs/test_eval/cube_lifting/ours/seed_113
+[done] task=cube_lifting seed=113 mode=ours exit=0
+[run] task=cube_lifting seed=113 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_113
+[done] task=cube_lifting seed=113 mode=ablation exit=0
+[run] task=cube_lifting seed=113 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_113
+[done] task=cube_lifting seed=113 mode=baseline exit=0
+[run] task=cube_lifting seed=114 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_114
+[done] task=cube_lifting seed=114 mode=ablation exit=0
+[run] task=cube_lifting seed=114 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_114
+[done] task=cube_lifting seed=114 mode=baseline exit=0
+[run] task=cube_lifting seed=114 mode=ours -> logs/test_eval/cube_lifting/ours/seed_114
+[done] task=cube_lifting seed=114 mode=ours exit=0
+[run] task=cube_lifting seed=115 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_115
+[done] task=cube_lifting seed=115 mode=baseline exit=0
+[run] task=cube_lifting seed=115 mode=ours -> logs/test_eval/cube_lifting/ours/seed_115
+[done] task=cube_lifting seed=115 mode=ours exit=0
+[run] task=cube_lifting seed=115 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_115
+[done] task=cube_lifting seed=115 mode=ablation exit=0
+[run] task=cube_lifting seed=116 mode=ours -> logs/test_eval/cube_lifting/ours/seed_116
+[done] task=cube_lifting seed=116 mode=ours exit=0
+[run] task=cube_lifting seed=116 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_116
+[done] task=cube_lifting seed=116 mode=ablation exit=0
+[run] task=cube_lifting seed=116 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_116
+[done] task=cube_lifting seed=116 mode=baseline exit=0
+[run] task=cube_lifting seed=117 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_117
+[done] task=cube_lifting seed=117 mode=ablation exit=0
+[run] task=cube_lifting seed=117 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_117
+[done] task=cube_lifting seed=117 mode=baseline exit=0
+[run] task=cube_lifting seed=117 mode=ours -> logs/test_eval/cube_lifting/ours/seed_117
+[done] task=cube_lifting seed=117 mode=ours exit=0
+[run] task=cube_lifting seed=118 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_118
+[done] task=cube_lifting seed=118 mode=baseline exit=0
+[run] task=cube_lifting seed=118 mode=ours -> logs/test_eval/cube_lifting/ours/seed_118
+[done] task=cube_lifting seed=118 mode=ours exit=0
+[run] task=cube_lifting seed=118 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_118
+[done] task=cube_lifting seed=118 mode=ablation exit=0
+[run] task=cube_lifting seed=119 mode=ours -> logs/test_eval/cube_lifting/ours/seed_119
+[done] task=cube_lifting seed=119 mode=ours exit=0
+[run] task=cube_lifting seed=119 mode=ablation -> logs/test_eval/cube_lifting/ablation/seed_119
+[done] task=cube_lifting seed=119 mode=ablation exit=0
+[run] task=cube_lifting seed=119 mode=baseline -> logs/test_eval/cube_lifting/baseline/seed_119
+[done] task=cube_lifting seed=119 mode=baseline exit=0
+[run] task=cube_stack seed=100 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_100
+[done] task=cube_stack seed=100 mode=baseline exit=0
+[run] task=cube_stack seed=100 mode=ours -> logs/test_eval/cube_stack/ours/seed_100
+[done] task=cube_stack seed=100 mode=ours exit=0
+[run] task=cube_stack seed=100 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_100
+[done] task=cube_stack seed=100 mode=ablation exit=0
+[run] task=cube_stack seed=101 mode=ours -> logs/test_eval/cube_stack/ours/seed_101
+[done] task=cube_stack seed=101 mode=ours exit=0
+[run] task=cube_stack seed=101 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_101
+[done] task=cube_stack seed=101 mode=ablation exit=0
+[run] task=cube_stack seed=101 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_101
+[done] task=cube_stack seed=101 mode=baseline exit=0
+[run] task=cube_stack seed=102 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_102
+[done] task=cube_stack seed=102 mode=ablation exit=0
+[run] task=cube_stack seed=102 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_102
+[done] task=cube_stack seed=102 mode=baseline exit=0
+[run] task=cube_stack seed=102 mode=ours -> logs/test_eval/cube_stack/ours/seed_102
+[done] task=cube_stack seed=102 mode=ours exit=0
+[run] task=cube_stack seed=103 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_103
+[done] task=cube_stack seed=103 mode=baseline exit=0
+[run] task=cube_stack seed=103 mode=ours -> logs/test_eval/cube_stack/ours/seed_103
+[done] task=cube_stack seed=103 mode=ours exit=0
+[run] task=cube_stack seed=103 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_103
+[done] task=cube_stack seed=103 mode=ablation exit=0
+[run] task=cube_stack seed=104 mode=ours -> logs/test_eval/cube_stack/ours/seed_104
+[done] task=cube_stack seed=104 mode=ours exit=0
+[run] task=cube_stack seed=104 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_104
+[done] task=cube_stack seed=104 mode=ablation exit=0
+[run] task=cube_stack seed=104 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_104
+[done] task=cube_stack seed=104 mode=baseline exit=0
+[run] task=cube_stack seed=105 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_105
+[done] task=cube_stack seed=105 mode=ablation exit=0
+[run] task=cube_stack seed=105 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_105
+[done] task=cube_stack seed=105 mode=baseline exit=0
+[run] task=cube_stack seed=105 mode=ours -> logs/test_eval/cube_stack/ours/seed_105
+[done] task=cube_stack seed=105 mode=ours exit=0
+[run] task=cube_stack seed=106 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_106
+[done] task=cube_stack seed=106 mode=baseline exit=0
+[run] task=cube_stack seed=106 mode=ours -> logs/test_eval/cube_stack/ours/seed_106
+[done] task=cube_stack seed=106 mode=ours exit=0
+[run] task=cube_stack seed=106 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_106
+[done] task=cube_stack seed=106 mode=ablation exit=0
+[run] task=cube_stack seed=107 mode=ours -> logs/test_eval/cube_stack/ours/seed_107
+[done] task=cube_stack seed=107 mode=ours exit=0
+[run] task=cube_stack seed=107 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_107
+[done] task=cube_stack seed=107 mode=ablation exit=0
+[run] task=cube_stack seed=107 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_107
+[done] task=cube_stack seed=107 mode=baseline exit=0
+[run] task=cube_stack seed=108 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_108
+[done] task=cube_stack seed=108 mode=ablation exit=0
+[run] task=cube_stack seed=108 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_108
+[done] task=cube_stack seed=108 mode=baseline exit=0
+[run] task=cube_stack seed=108 mode=ours -> logs/test_eval/cube_stack/ours/seed_108
+[done] task=cube_stack seed=108 mode=ours exit=0
+[run] task=cube_stack seed=109 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_109
+[done] task=cube_stack seed=109 mode=baseline exit=0
+[run] task=cube_stack seed=109 mode=ours -> logs/test_eval/cube_stack/ours/seed_109
+[done] task=cube_stack seed=109 mode=ours exit=0
+[run] task=cube_stack seed=109 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_109
+[done] task=cube_stack seed=109 mode=ablation exit=0
+[run] task=cube_stack seed=110 mode=ours -> logs/test_eval/cube_stack/ours/seed_110
+[done] task=cube_stack seed=110 mode=ours exit=0
+[run] task=cube_stack seed=110 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_110
+[done] task=cube_stack seed=110 mode=ablation exit=0
+[run] task=cube_stack seed=110 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_110
+[done] task=cube_stack seed=110 mode=baseline exit=0
+[run] task=cube_stack seed=111 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_111
+[done] task=cube_stack seed=111 mode=ablation exit=0
+[run] task=cube_stack seed=111 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_111
+[done] task=cube_stack seed=111 mode=baseline exit=0
+[run] task=cube_stack seed=111 mode=ours -> logs/test_eval/cube_stack/ours/seed_111
+[done] task=cube_stack seed=111 mode=ours exit=0
+[run] task=cube_stack seed=112 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_112
+[done] task=cube_stack seed=112 mode=baseline exit=0
+[run] task=cube_stack seed=112 mode=ours -> logs/test_eval/cube_stack/ours/seed_112
+[done] task=cube_stack seed=112 mode=ours exit=0
+[run] task=cube_stack seed=112 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_112
+[done] task=cube_stack seed=112 mode=ablation exit=0
+[run] task=cube_stack seed=113 mode=ours -> logs/test_eval/cube_stack/ours/seed_113
+[done] task=cube_stack seed=113 mode=ours exit=0
+[run] task=cube_stack seed=113 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_113
+[done] task=cube_stack seed=113 mode=ablation exit=0
+[run] task=cube_stack seed=113 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_113
+[done] task=cube_stack seed=113 mode=baseline exit=0
+[run] task=cube_stack seed=114 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_114
+[done] task=cube_stack seed=114 mode=ablation exit=0
+[run] task=cube_stack seed=114 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_114
+[done] task=cube_stack seed=114 mode=baseline exit=0
+[run] task=cube_stack seed=114 mode=ours -> logs/test_eval/cube_stack/ours/seed_114
+[done] task=cube_stack seed=114 mode=ours exit=0
+[run] task=cube_stack seed=115 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_115
+[done] task=cube_stack seed=115 mode=baseline exit=0
+[run] task=cube_stack seed=115 mode=ours -> logs/test_eval/cube_stack/ours/seed_115
+[done] task=cube_stack seed=115 mode=ours exit=0
+[run] task=cube_stack seed=115 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_115
+[done] task=cube_stack seed=115 mode=ablation exit=0
+[run] task=cube_stack seed=116 mode=ours -> logs/test_eval/cube_stack/ours/seed_116
+[done] task=cube_stack seed=116 mode=ours exit=0
+[run] task=cube_stack seed=116 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_116
+[done] task=cube_stack seed=116 mode=ablation exit=0
+[run] task=cube_stack seed=116 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_116
+[done] task=cube_stack seed=116 mode=baseline exit=0
+[run] task=cube_stack seed=117 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_117
+[done] task=cube_stack seed=117 mode=ablation exit=0
+[run] task=cube_stack seed=117 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_117
+[done] task=cube_stack seed=117 mode=baseline exit=0
+[run] task=cube_stack seed=117 mode=ours -> logs/test_eval/cube_stack/ours/seed_117
+[done] task=cube_stack seed=117 mode=ours exit=0
+[run] task=cube_stack seed=118 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_118
+[done] task=cube_stack seed=118 mode=baseline exit=0
+[run] task=cube_stack seed=118 mode=ours -> logs/test_eval/cube_stack/ours/seed_118
+[done] task=cube_stack seed=118 mode=ours exit=0
+[run] task=cube_stack seed=118 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_118
+[done] task=cube_stack seed=118 mode=ablation exit=0
+[run] task=cube_stack seed=119 mode=ours -> logs/test_eval/cube_stack/ours/seed_119
+[done] task=cube_stack seed=119 mode=ours exit=0
+[run] task=cube_stack seed=119 mode=ablation -> logs/test_eval/cube_stack/ablation/seed_119
+[done] task=cube_stack seed=119 mode=ablation exit=0
+[run] task=cube_stack seed=119 mode=baseline -> logs/test_eval/cube_stack/baseline/seed_119
+[done] task=cube_stack seed=119 mode=baseline exit=0
+[run] task=cube_restack seed=100 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_100
+[done] task=cube_restack seed=100 mode=baseline exit=0
+[run] task=cube_restack seed=100 mode=ours -> logs/test_eval/cube_restack/ours/seed_100
+[done] task=cube_restack seed=100 mode=ours exit=0
+[run] task=cube_restack seed=100 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_100
+[done] task=cube_restack seed=100 mode=ablation exit=0
+[run] task=cube_restack seed=101 mode=ours -> logs/test_eval/cube_restack/ours/seed_101
+[done] task=cube_restack seed=101 mode=ours exit=0
+[run] task=cube_restack seed=101 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_101
+[done] task=cube_restack seed=101 mode=ablation exit=0
+[run] task=cube_restack seed=101 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_101
+[done] task=cube_restack seed=101 mode=baseline exit=0
+[run] task=cube_restack seed=102 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_102
+[done] task=cube_restack seed=102 mode=ablation exit=0
+[run] task=cube_restack seed=102 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_102
+[done] task=cube_restack seed=102 mode=baseline exit=0
+[run] task=cube_restack seed=102 mode=ours -> logs/test_eval/cube_restack/ours/seed_102
+[done] task=cube_restack seed=102 mode=ours exit=0
+[run] task=cube_restack seed=103 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_103
+[done] task=cube_restack seed=103 mode=baseline exit=0
+[run] task=cube_restack seed=103 mode=ours -> logs/test_eval/cube_restack/ours/seed_103
+[done] task=cube_restack seed=103 mode=ours exit=0
+[run] task=cube_restack seed=103 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_103
+[done] task=cube_restack seed=103 mode=ablation exit=0
+[run] task=cube_restack seed=104 mode=ours -> logs/test_eval/cube_restack/ours/seed_104
+[done] task=cube_restack seed=104 mode=ours exit=0
+[run] task=cube_restack seed=104 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_104
+[done] task=cube_restack seed=104 mode=ablation exit=0
+[run] task=cube_restack seed=104 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_104
+[done] task=cube_restack seed=104 mode=baseline exit=0
+[run] task=cube_restack seed=105 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_105
+[done] task=cube_restack seed=105 mode=ablation exit=0
+[run] task=cube_restack seed=105 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_105
+[done] task=cube_restack seed=105 mode=baseline exit=0
+[run] task=cube_restack seed=105 mode=ours -> logs/test_eval/cube_restack/ours/seed_105
+[done] task=cube_restack seed=105 mode=ours exit=0
+[run] task=cube_restack seed=106 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_106
+[done] task=cube_restack seed=106 mode=baseline exit=0
+[run] task=cube_restack seed=106 mode=ours -> logs/test_eval/cube_restack/ours/seed_106
+[done] task=cube_restack seed=106 mode=ours exit=0
+[run] task=cube_restack seed=106 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_106
+[done] task=cube_restack seed=106 mode=ablation exit=0
+[run] task=cube_restack seed=107 mode=ours -> logs/test_eval/cube_restack/ours/seed_107
+[done] task=cube_restack seed=107 mode=ours exit=0
+[run] task=cube_restack seed=107 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_107
+[done] task=cube_restack seed=107 mode=ablation exit=0
+[run] task=cube_restack seed=107 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_107
+[done] task=cube_restack seed=107 mode=baseline exit=0
+[run] task=cube_restack seed=108 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_108
+[done] task=cube_restack seed=108 mode=ablation exit=0
+[run] task=cube_restack seed=108 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_108
+[done] task=cube_restack seed=108 mode=baseline exit=0
+[run] task=cube_restack seed=108 mode=ours -> logs/test_eval/cube_restack/ours/seed_108
+[done] task=cube_restack seed=108 mode=ours exit=0
+[run] task=cube_restack seed=109 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_109
+[done] task=cube_restack seed=109 mode=baseline exit=0
+[run] task=cube_restack seed=109 mode=ours -> logs/test_eval/cube_restack/ours/seed_109
+[done] task=cube_restack seed=109 mode=ours exit=0
+[run] task=cube_restack seed=109 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_109
+[done] task=cube_restack seed=109 mode=ablation exit=0
+[run] task=cube_restack seed=110 mode=ours -> logs/test_eval/cube_restack/ours/seed_110
+[done] task=cube_restack seed=110 mode=ours exit=0
+[run] task=cube_restack seed=110 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_110
+[done] task=cube_restack seed=110 mode=ablation exit=0
+[run] task=cube_restack seed=110 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_110
+[done] task=cube_restack seed=110 mode=baseline exit=0
+[run] task=cube_restack seed=111 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_111
+=== resume 2026-10-26T13:20:45+08:00
+[skip] logs/test_eval/cube_lifting/baseline/seed_100 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_100 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_100 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_101 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_101 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_101 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_102 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_102 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_102 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_103 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_103 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_103 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_104 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_104 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_104 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_105 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_105 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_105 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_106 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_106 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_106 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_107 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_107 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_107 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_108 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_108 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_108 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_109 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_109 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_109 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_110 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_110 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_110 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_111 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_111 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_111 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_112 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_112 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_112 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_113 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_113 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_113 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_114 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_114 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_114 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_115 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_115 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_115 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_116 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_116 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_116 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_117 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_117 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_117 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_118 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_118 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_118 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ours/seed_119 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/ablation/seed_119 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_lifting/baseline/seed_119 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_100 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_100 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_100 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_101 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_101 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_101 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_102 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_102 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_102 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_103 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_103 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_103 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_104 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_104 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_104 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_105 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_105 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_105 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_106 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_106 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_106 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_107 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_107 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_107 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_108 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_108 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_108 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_109 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_109 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_109 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_110 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_110 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_110 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_111 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_111 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_111 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_112 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_112 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_112 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_113 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_113 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_113 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_114 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_114 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_114 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_115 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_115 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_115 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_116 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_116 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_116 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_117 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_117 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_117 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_118 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ours/seed_118 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/ablation/seed_118 already has an episode log (no reruns)
+[run] task=cube_stack seed=119 mode=ours -> logs/test_eval/cube_stack/ours/seed_119
+[done] task=cube_stack seed=119 mode=ours exit=0
+[skip] logs/test_eval/cube_stack/ablation/seed_119 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_stack/baseline/seed_119 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_100 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_100 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_100 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_101 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_101 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_101 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_102 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_102 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_102 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_103 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_103 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_103 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_104 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_104 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_104 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_105 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_105 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_105 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_106 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_106 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_106 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_107 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_107 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_107 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_108 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_108 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_108 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_109 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_109 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_109 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ours/seed_110 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/ablation/seed_110 already has an episode log (no reruns)
+[skip] logs/test_eval/cube_restack/baseline/seed_110 already has an episode log (no reruns)
+[run] task=cube_restack seed=111 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_111
+[done] task=cube_restack seed=111 mode=ablation exit=0
+[run] task=cube_restack seed=111 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_111
+[done] task=cube_restack seed=111 mode=baseline exit=0
+[run] task=cube_restack seed=111 mode=ours -> logs/test_eval/cube_restack/ours/seed_111
+[done] task=cube_restack seed=111 mode=ours exit=0
+[run] task=cube_restack seed=112 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_112
+[done] task=cube_restack seed=112 mode=baseline exit=0
+[run] task=cube_restack seed=112 mode=ours -> logs/test_eval/cube_restack/ours/seed_112
+[done] task=cube_restack seed=112 mode=ours exit=0
+[run] task=cube_restack seed=112 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_112
+[done] task=cube_restack seed=112 mode=ablation exit=0
+[run] task=cube_restack seed=113 mode=ours -> logs/test_eval/cube_restack/ours/seed_113
+[done] task=cube_restack seed=113 mode=ours exit=0
+[run] task=cube_restack seed=113 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_113
+[done] task=cube_restack seed=113 mode=ablation exit=0
+[run] task=cube_restack seed=113 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_113
+[done] task=cube_restack seed=113 mode=baseline exit=0
+[run] task=cube_restack seed=114 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_114
+[done] task=cube_restack seed=114 mode=ablation exit=0
+[run] task=cube_restack seed=114 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_114
+[done] task=cube_restack seed=114 mode=baseline exit=0
+[run] task=cube_restack seed=114 mode=ours -> logs/test_eval/cube_restack/ours/seed_114
+[done] task=cube_restack seed=114 mode=ours exit=0
+[run] task=cube_restack seed=115 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_115
+[done] task=cube_restack seed=115 mode=baseline exit=0
+[run] task=cube_restack seed=115 mode=ours -> logs/test_eval/cube_restack/ours/seed_115
+[done] task=cube_restack seed=115 mode=ours exit=0
+[run] task=cube_restack seed=115 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_115
+[done] task=cube_restack seed=115 mode=ablation exit=0
+[run] task=cube_restack seed=116 mode=ours -> logs/test_eval/cube_restack/ours/seed_116
+[done] task=cube_restack seed=116 mode=ours exit=0
+[run] task=cube_restack seed=116 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_116
+[done] task=cube_restack seed=116 mode=ablation exit=0
+[run] task=cube_restack seed=116 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_116
+[done] task=cube_restack seed=116 mode=baseline exit=0
+[run] task=cube_restack seed=117 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_117
+[done] task=cube_restack seed=117 mode=ablation exit=0
+[run] task=cube_restack seed=117 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_117
+[done] task=cube_restack seed=117 mode=baseline exit=0
+[run] task=cube_restack seed=117 mode=ours -> logs/test_eval/cube_restack/ours/seed_117
+[done] task=cube_restack seed=117 mode=ours exit=0
+[run] task=cube_restack seed=118 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_118
+[done] task=cube_restack seed=118 mode=baseline exit=0
+[run] task=cube_restack seed=118 mode=ours -> logs/test_eval/cube_restack/ours/seed_118
+[done] task=cube_restack seed=118 mode=ours exit=0
+[run] task=cube_restack seed=118 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_118
+[done] task=cube_restack seed=118 mode=ablation exit=0
+[run] task=cube_restack seed=119 mode=ours -> logs/test_eval/cube_restack/ours/seed_119
+[done] task=cube_restack seed=119 mode=ours exit=0
+[run] task=cube_restack seed=119 mode=ablation -> logs/test_eval/cube_restack/ablation/seed_119
+[done] task=cube_restack seed=119 mode=ablation exit=0
+[run] task=cube_restack seed=119 mode=baseline -> logs/test_eval/cube_restack/baseline/seed_119
+[done] task=cube_restack seed=119 mode=baseline exit=0

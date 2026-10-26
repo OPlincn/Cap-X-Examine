@@ -1,0 +1,96 @@
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasp_poses[best_idx]
+grasp_world = ext @ best_T
+
+pos = grasp_world[:3, :3]
+# approach from above: use identity-ish orientation pointing down
+quat = np.array([0.0, 1.0, 0.0, 0.0])  # wxyz, gripper pointing down
+target_pos = grasp_world[:3, 3]
+# lift a bit above before descending
+pre = target_pos.copy()
+pre[2] += 0.1
+
+open_gripper()
+joints = solve_ik(pre, quat)
+move_to_joints(joints)
+joints = solve_ik(target_pos, quat)
+move_to_joints(joints)
+close_gripper()
+lift = target_pos.copy()
+lift[2] += 0.15
+joints = solve_ik(lift, quat)
+move_to_joints(joints)
+print("done", target_pos)
+
+# Code block 1
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasp_poses[best_idx]
+grasp_world = ext @ best_T
+
+# Use the grasp pose orientation directly (in world frame)
+quat = np.array([0.0, 1.0, 0.0, 0.0])  # wxyz, gripper pointing down
+target_pos = grasp_world[:3, 3].copy()
+
+# Approach from above
+pre = target_pos.copy()
+pre[2] += 0.12
+
+open_gripper()
+joints = solve_ik(pre, quat)
+move_to_joints(joints)
+
+# Descend to grasp position
+joints = solve_ik(target_pos, quat)
+move_to_joints(joints)
+
+close_gripper()
+
+# Lift
+lift = target_pos.copy()
+lift[2] += 0.2
+joints = solve_ik(lift, quat)
+move_to_joints(joints)
+print("done", target_pos)
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: done [ 0.56131126  0.03066869 -0.10217989]
+
+  Stderr: 
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 1
+  Num Finishes: 1
+  Num Code Blocks: 2
+----------------------------------------------------------------------------------------------------
