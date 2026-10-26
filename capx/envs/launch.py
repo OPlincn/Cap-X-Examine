@@ -144,6 +144,16 @@ class LaunchArgs:
     max_wall_time_s: int | None = None
     """Per-episode wall-clock cap in seconds. Overrides the YAML budget."""
 
+    # Post-hoc diagnostics (Phase 3; never used by the frozen evaluation)
+    posthoc_variant: str | None = None
+    """Post-hoc variant of ``ours``: ref_only, gate_only or ref_and_gate."""
+
+    replay_turn0_from: str | None = None
+    """Episode JSON whose turn-0 scene description and initial code are replayed (turn-0 matching)."""
+
+    replay_turn0_vdm: bool = False
+    """Also replay the frozen turn-0 VDM verdict (only valid when its input is unchanged, e.g. gate_only)."""
+
 
 # ---------------------------------------------------------------------------
 # Web UI

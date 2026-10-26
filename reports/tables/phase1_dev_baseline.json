@@ -1,0 +1,101 @@
+{
+  "rows": {
+    "cube_lifting/baseline": {
+      "n": 3,
+      "success": 3,
+      "code_exec_success_rate": 0.8235294117647058,
+      "avg_turns": 5.666666666666667,
+      "avg_coding_tokens": 33633.666666666664,
+      "avg_vdm_tokens": 17421.0,
+      "avg_total_tokens": 51054.666666666664,
+      "avg_model_calls": 13.333333333333334,
+      "avg_vdm_calls": 6.666666666666667,
+      "avg_perception_calls": 9.0,
+      "avg_sim_steps": 773.3333333333334,
+      "avg_wall_time": 150.8851659297943,
+      "avg_reward": 1.0,
+      "terminations": {
+        "finish": 3
+      },
+      "budget_or_timeout": 0,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "cube_restack/baseline": {
+      "n": 3,
+      "success": 2,
+      "code_exec_success_rate": 0.5714285714285714,
+      "avg_turns": 2.3333333333333335,
+      "avg_coding_tokens": 16764.666666666668,
+      "avg_vdm_tokens": 8284.0,
+      "avg_total_tokens": 25048.666666666668,
+      "avg_model_calls": 6.666666666666667,
+      "avg_vdm_calls": 3.3333333333333335,
+      "avg_perception_calls": 3.3333333333333335,
+      "avg_sim_steps": 360.3333333333333,
+      "avg_wall_time": 81.22173754374187,
+      "avg_reward": 0.6670678760147637,
+      "terminations": {
+        "finish": 3
+      },
+      "budget_or_timeout": 0,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "cube_stack/baseline": {
+      "n": 3,
+      "success": 3,
+      "code_exec_success_rate": 0.6666666666666666,
+      "avg_turns": 2.0,
+      "avg_coding_tokens": 13097.333333333334,
+      "avg_vdm_tokens": 7359.666666666667,
+      "avg_total_tokens": 20457.0,
+      "avg_model_calls": 6.0,
+      "avg_vdm_calls": 3.0,
+      "avg_perception_calls": 3.0,
+      "avg_sim_steps": 243.0,
+      "avg_wall_time": 51.75441233317057,
+      "avg_reward": 1.0,
+      "terminations": {
+        "finish": 3
+      },
+      "budget_or_timeout": 0,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    },
+    "spill_wipe/baseline": {
+      "n": 3,
+      "success": 3,
+      "code_exec_success_rate": 0.8,
+      "avg_turns": 1.6666666666666667,
+      "avg_coding_tokens": 9963.0,
+      "avg_vdm_tokens": 7102.0,
+      "avg_total_tokens": 17065.0,
+      "avg_model_calls": 5.333333333333333,
+      "avg_vdm_calls": 2.6666666666666665,
+      "avg_perception_calls": 1.3333333333333333,
+      "avg_sim_steps": 390.0,
+      "avg_wall_time": 51.45737942059835,
+      "avg_reward": 1.0,
+      "terminations": {
+        "finish": 3
+      },
+      "budget_or_timeout": 0,
+      "seeds": [
+        0,
+        1,
+        2
+      ]
+    }
+  },
+  "integrity_problems": []
+}

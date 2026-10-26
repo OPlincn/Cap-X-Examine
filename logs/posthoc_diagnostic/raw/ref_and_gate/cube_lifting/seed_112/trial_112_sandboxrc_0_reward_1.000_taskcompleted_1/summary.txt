@@ -1,0 +1,135 @@
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+print("rgb shape:", rgb.shape)
+print("depth shape:", depth.shape, "dtype:", depth.dtype)
+print("intrinsics:\n", K)
+print("cam_pose:\n", cam_pose)
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+print("num masks:", len(masks))
+for i, m in enumerate(masks):
+    print(i, "score:", m.get("score"), "box:", m.get("box"), "mask sum:", m["mask"].sum())
+
+# Code block 1
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+print("best score:", best["score"], "box:", best["box"], "sum:", mask.sum())
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+print("num grasps:", len(grasp_poses))
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasp_poses[best_idx]
+print("best grasp score:", grasp_scores[best_idx])
+print("best_T (camera frame):\n", best_T)
+
+# Transform to world frame
+grasp_world = cam_pose @ best_T
+print("grasp_world:\n", grasp_world)
+
+# Extract position and orientation
+pos = grasp_world[:3, 3]
+R = grasp_world[:3, :3]
+
+# Convert rotation matrix to quaternion (wxyz)
+def rot_to_quat(R):
+    tr = R[0,0] + R[1,1] + R[2,2]
+    if tr > 0:
+        S = np.sqrt(tr + 1.0) * 2
+        w = 0.25 * S
+        x = (R[2,1] - R[1,2]) / S
+        y = (R[0,2] - R[2,0]) / S
+        z = (R[1,0] - R[0,1]) / S
+    elif (R[0,0] > R[1,1]) and (R[0,0] > R[2,2]):
+        S = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2
+        w = (R[2,1] - R[1,2]) / S
+        x = 0.25 * S
+        y = (R[0,1] + R[1,0]) / S
+        z = (R[0,2] + R[2,0]) / S
+    elif R[1,1] > R[2,2]:
+        S = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2
+        w = (R[0,2] - R[2,0]) / S
+        x = (R[0,1] + R[1,0]) / S
+        y = 0.25 * S
+        z = (R[1,2] + R[2,1]) / S
+    else:
+        S = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2
+        w = (R[1,0] - R[0,1]) / S
+        x = (R[0,2] + R[2,0]) / S
+        y = (R[1,2] + R[2,1]) / S
+        z = 0.25 * S
+    return np.array([w, x, y, z])
+
+quat = rot_to_quat(R)
+print("pos:", pos)
+print("quat:", quat)
+
+# Approach from above: pre-grasp pose
+pre_pos = pos.copy()
+pre_pos[2] += 0.10
+
+open_gripper()
+joints_pre = solve_ik(pre_pos, quat)
+move_to_joints(joints_pre)
+
+# Move down to grasp
+joints_grasp = solve_ik(pos, quat)
+move_to_joints(joints_grasp)
+
+close_gripper()
+
+# Lift
+lift_pos = pos.copy()
+lift_pos[2] += 0.15
+joints_lift = solve_ik(lift_pos, quat)
+move_to_joints(joints_lift)
+
+print("done")
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: best score: 0.91796875 box: [250.42388916015625, 243.5846710205078, 297.10797119140625, 301.52227783203125] sum: 2222
+num grasps: 129
+best grasp score: 0.26611307
+best_T (camera frame):
+ [[ 0.32051798  0.9413764   0.10525539  0.03702845]
+ [-0.88283333  0.25659947  0.39339804  0.01502483]
+ [ 0.34332715 -0.21901411  0.91332321  0.67359432]
+ [ 0.          0.          0.          1.        ]]
+grasp_world:
+ [[-0.86650859  0.33627327 -0.36889449  0.53366158]
+ [ 0.32051798  0.9413764   0.10525539  0.03702845]
+ [ 0.38266315 -0.02703261 -0.92349237 -0.09629572]
+ [ 0.          0.          0.          1.        ]]
+pos: [ 0.53366158  0.03702845 -0.09629572]
+quat: [-0.19453498  0.17000542  0.96583867  0.02024737]
+done
+
+  Stderr: 
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 1
+  Num Finishes: 1
+  Num Code Blocks: 2
+----------------------------------------------------------------------------------------------------

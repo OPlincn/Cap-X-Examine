@@ -187,6 +187,9 @@ def _load_config(args: LaunchArgs) -> tuple[Any, dict[str, Any], list]:
         "seeds": seeds,
         "insert_model_in_output_dir": configs_dict.get("insert_model_in_output_dir", True),
         "max_trial_retries": configs_dict.get("max_trial_retries", 3),
+        "posthoc_variant": getattr(args, "posthoc_variant", None),
+        "replay_turn0_from": getattr(args, "replay_turn0_from", None),
+        "replay_turn0_vdm": bool(getattr(args, "replay_turn0_vdm", False)),
     }
 
     return env_factory, merged_config, api_servers

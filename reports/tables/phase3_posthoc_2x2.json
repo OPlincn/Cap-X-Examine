@@ -1,0 +1,641 @@
+{
+  "seeds": [
+    102,
+    107,
+    109,
+    110,
+    114,
+    116
+  ],
+  "results": {
+    "matched": {
+      "ours": {
+        "n": 6,
+        "turn0_lifted": 6,
+        "turn0_false_negative": 6,
+        "avg_turns": 8.0,
+        "avg_total_tokens": 54649.333333333336,
+        "avg_vdm_calls": 2.0,
+        "avg_gate_skips": 6.0,
+        "code_exec_rate": 0.125,
+        "turn_cap_hits": 6,
+        "success": 6,
+        "avg_turns_after_goal": 7.0,
+        "per_seed": {
+          "102": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "107": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "109": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "110": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "114": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "116": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          }
+        }
+      },
+      "ref_only": {
+        "n": 6,
+        "turn0_lifted": 5,
+        "turn0_false_negative": 0,
+        "avg_turns": 1.1666666666666667,
+        "avg_total_tokens": 12702.833333333334,
+        "avg_vdm_calls": 2.1666666666666665,
+        "avg_gate_skips": 0.0,
+        "code_exec_rate": 1.0,
+        "turn_cap_hits": 0,
+        "success": 6,
+        "avg_turns_after_goal": 0.0,
+        "per_seed": {
+          "102": {
+            "turns": 2,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "107": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "109": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "110": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "114": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "116": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          }
+        }
+      },
+      "gate_only": {
+        "n": 6,
+        "turn0_lifted": 5,
+        "turn0_false_negative": 5,
+        "avg_turns": 4.5,
+        "avg_total_tokens": 36526.666666666664,
+        "avg_vdm_calls": 2.6666666666666665,
+        "avg_gate_skips": 2.6666666666666665,
+        "code_exec_rate": 0.4074074074074074,
+        "turn_cap_hits": 1,
+        "success": 6,
+        "avg_turns_after_goal": 3.3333333333333335,
+        "per_seed": {
+          "102": {
+            "turns": 5,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "107": {
+            "turns": 2,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "109": {
+            "turns": 3,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "110": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "114": {
+            "turns": 2,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "116": {
+            "turns": 7,
+            "end": "max_total_tokens",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          }
+        }
+      },
+      "ref_and_gate": {
+        "n": 6,
+        "turn0_lifted": 6,
+        "turn0_false_negative": 0,
+        "avg_turns": 1.0,
+        "avg_total_tokens": 11430.166666666666,
+        "avg_vdm_calls": 2.0,
+        "avg_gate_skips": 0.0,
+        "code_exec_rate": 1.0,
+        "turn_cap_hits": 0,
+        "success": 6,
+        "avg_turns_after_goal": 0.0,
+        "per_seed": {
+          "102": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "107": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "109": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "110": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "114": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "116": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          }
+        }
+      }
+    },
+    "raw": {
+      "ours": {
+        "n": 6,
+        "turn0_lifted": 6,
+        "turn0_false_negative": 6,
+        "avg_turns": 8.0,
+        "avg_total_tokens": 54649.333333333336,
+        "avg_vdm_calls": 2.0,
+        "avg_gate_skips": 6.0,
+        "code_exec_rate": 0.125,
+        "turn_cap_hits": 6,
+        "success": 6,
+        "avg_turns_after_goal": 7.0,
+        "per_seed": {
+          "102": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "107": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "109": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "110": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "114": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "116": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          }
+        }
+      },
+      "ref_only": {
+        "n": 6,
+        "turn0_lifted": 6,
+        "turn0_false_negative": 0,
+        "avg_turns": 1.0,
+        "avg_total_tokens": 10862.666666666666,
+        "avg_vdm_calls": 2.0,
+        "avg_gate_skips": 0.0,
+        "code_exec_rate": 1.0,
+        "turn_cap_hits": 0,
+        "success": 6,
+        "avg_turns_after_goal": 0.0,
+        "per_seed": {
+          "102": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "107": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "109": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "110": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "114": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "116": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          }
+        }
+      },
+      "gate_only": {
+        "n": 6,
+        "turn0_lifted": 6,
+        "turn0_false_negative": 2,
+        "avg_turns": 2.8333333333333335,
+        "avg_total_tokens": 23664.166666666668,
+        "avg_vdm_calls": 2.0,
+        "avg_gate_skips": 1.6666666666666667,
+        "code_exec_rate": 0.4117647058823529,
+        "turn_cap_hits": 1,
+        "success": 6,
+        "avg_turns_after_goal": 1.8333333333333333,
+        "per_seed": {
+          "102": {
+            "turns": 5,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "107": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "109": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "110": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "114": {
+            "turns": 8,
+            "end": "max_turns",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "116": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          }
+        }
+      },
+      "ref_and_gate": {
+        "n": 6,
+        "turn0_lifted": 5,
+        "turn0_false_negative": 0,
+        "avg_turns": 1.1666666666666667,
+        "avg_total_tokens": 12903.333333333334,
+        "avg_vdm_calls": 2.0,
+        "avg_gate_skips": 0.16666666666666666,
+        "code_exec_rate": 1.0,
+        "turn_cap_hits": 0,
+        "success": 6,
+        "avg_turns_after_goal": 0.0,
+        "per_seed": {
+          "102": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "107": {
+            "turns": 2,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "109": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "110": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "114": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "116": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          }
+        }
+      }
+    },
+    "generalization": {
+      "seeds": [
+        100,
+        101,
+        103,
+        104,
+        105,
+        106,
+        108,
+        111,
+        112,
+        113,
+        115,
+        117,
+        118,
+        119
+      ],
+      "ours": {
+        "n": 14,
+        "turn0_lifted": 13,
+        "turn0_false_negative": 0,
+        "avg_turns": 1.0714285714285714,
+        "avg_total_tokens": 12057.07142857143,
+        "avg_vdm_calls": 2.0,
+        "avg_gate_skips": 0.07142857142857142,
+        "code_exec_rate": 1.0,
+        "turn_cap_hits": 0,
+        "success": 14,
+        "avg_turns_after_goal": 0.0,
+        "per_seed": {
+          "100": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "101": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "103": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "104": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "105": {
+            "turns": 2,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "106": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "108": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "111": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "112": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "113": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "115": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "117": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "118": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "119": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          }
+        }
+      },
+      "ref_and_gate": {
+        "n": 14,
+        "turn0_lifted": 9,
+        "turn0_false_negative": 0,
+        "avg_turns": 1.4285714285714286,
+        "avg_total_tokens": 14878.714285714286,
+        "avg_vdm_calls": 2.0714285714285716,
+        "avg_gate_skips": 0.35714285714285715,
+        "code_exec_rate": 0.9,
+        "turn_cap_hits": 0,
+        "success": 14,
+        "avg_turns_after_goal": 0.0,
+        "per_seed": {
+          "100": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "101": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "103": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "104": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "105": {
+            "turns": 2,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "106": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "108": {
+            "turns": 2,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "111": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "112": {
+            "turns": 2,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "113": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "115": {
+            "turns": 3,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          },
+          "117": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "118": {
+            "turns": 1,
+            "end": "finish",
+            "t0_verdict": "COMPLETE",
+            "success": true
+          },
+          "119": {
+            "turns": 2,
+            "end": "finish",
+            "t0_verdict": "NOT COMPLETE",
+            "success": true
+          }
+        }
+      }
+    }
+  },
+  "problems": []
+}

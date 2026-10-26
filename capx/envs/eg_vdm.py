@@ -43,6 +43,18 @@ _VERDICT_RE = re.compile(r"Verdict\s*[:：]\s*\**\s*(NOT COMPLETE|COMPLETE|UNCER
 INITIAL_MOTION_VERDICT = "NOT COMPLETE (No physical robot motion has been executed in this episode yet)"
 
 _MAX_GRIPPER_EVENTS = 6
+
+# Post-hoc diagnostic variants of ``ours`` (Phase 3). ``None`` is the frozen behaviour.
+POSTHOC_VARIANTS = ("ref_only", "gate_only", "ref_and_gate")
+HOLDING_OPENING_RANGE = (0.05, 0.85)
+
+
+def uses_grasp_reference(variant: str | None) -> bool:
+    return variant in ("ref_only", "ref_and_gate")
+
+
+def uses_gate_expiry(variant: str | None) -> bool:
+    return variant in ("gate_only", "ref_and_gate")
 _STDOUT_CHARS = 1500
 
 # ---------------------------------------------------------------------------
@@ -153,8 +165,12 @@ def _fmt_vec(v: list[float] | None) -> str:
     return "unknown" if v is None else "[" + ", ".join(f"{x:+.3f}" for x in v) + "]"
 
 
-def format_exec_header(rec: dict[str, Any]) -> str:
-    """Concise factual record shown in the feedback slot (and to the VDM in ``ours``)."""
+def format_exec_header(rec: dict[str, Any], grasp_relative: bool = False) -> str:
+    """Concise factual record shown in the feedback slot (and to the VDM in ``ours``).
+
+    ``grasp_relative`` (post-hoc ``ref_*`` variants) replaces the turn-start -> turn-end Δ with the
+    vertical displacement relative to the height at the last ``close_gripper`` of the turn.
+    """
     if rec["exec_ok"]:
         status = "completed without exception"
     else:
@@ -172,7 +188,24 @@ def format_exec_header(rec: dict[str, Any]) -> str:
         f"- Simulator steps this turn: {rec['sim_steps_delta']}",
     ]
     pb, pa = rec["proprio_before"], rec["proprio_after"]
-    if pb and pa:
+    if pb and pa and grasp_relative:
+        lines.append(
+            f"- End-effector xyz (robot base frame, m): at turn start {_fmt_vec(pb['eef_xyz'])} -> "
+            f"at turn end {_fmt_vec(pa['eef_xyz'])} (the turn starts wherever the previous turn "
+            f"ended, e.g. the high home pose, so this difference is not a lift height)"
+        )
+        closes = [e for e in rec.get("gripper_events", [])
+                  if e.get("call") == "close_gripper" and e.get("eef_xyz") is not None]
+        if closes:
+            z_grasp, z_now = closes[-1]["eef_xyz"][2], pa["eef_xyz"][2]
+            dz = z_now - z_grasp
+            where = "above" if dz >= 0 else "below"
+            lines.append(
+                f"- Vertical displacement since the last close_gripper: grasp at EEF z = {z_grasp:+.3f} m "
+                f"-> current EEF z = {z_now:+.3f} m (Δz_from_grasp = {dz:+.3f} m, i.e. {abs(dz):.3f} m "
+                f"{where} the height where the gripper closed)"
+            )
+    elif pb and pa:
         delta = [round(a - b, 4) for a, b in zip(pa["eef_xyz"], pb["eef_xyz"])]
         lines.append(
             f"- End-effector xyz (robot base frame, m): before {_fmt_vec(pb['eef_xyz'])} -> "
@@ -195,7 +228,7 @@ def format_exec_header(rec: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def format_exec_context_for_vdm(rec: dict[str, Any]) -> str:
+def format_exec_context_for_vdm(rec: dict[str, Any], grasp_relative: bool = False) -> str:
     """Execution record given to the VDM in ``ours``: measured facts and stdout, not the code.
 
     The code itself is withheld from the VDM because its comments state the intended outcome
@@ -205,7 +238,7 @@ def format_exec_context_for_vdm(rec: dict[str, Any]) -> str:
     return (
         "Execution record of the robot turn that happened between the two images "
         "(measured by the robot itself; it does not tell you whether the goal was achieved):\n"
-        f"{format_exec_header(rec)}\n"
+        f"{format_exec_header(rec, grasp_relative=grasp_relative)}\n"
         f"Console stdout printed by the robot's code:\n```\n{stdout}\n```\n"
         "The record shows what the robot did, not what resulted: a grasp can miss and "
         "an object can slip or be placed beside its target. Judge the outcome from the images together "
@@ -227,6 +260,7 @@ def structured_vdm_prompt(
     *,
     exec_record: dict[str, Any] | None,
     generic_checklist: bool,
+    grasp_relative: bool = False,
 ) -> list[dict[str, Any]]:
     # Images come before the execution record / checklist so the images are read first.
     content: list[dict[str, Any]] = [
@@ -237,7 +271,7 @@ def structured_vdm_prompt(
         {"type": "image_url", "image_url": {"url": cur_image}},
     ]
     if exec_record is not None:
-        content.append({"type": "text", "text": format_exec_context_for_vdm(exec_record)})
+        content.append({"type": "text", "text": format_exec_context_for_vdm(exec_record, grasp_relative)})
     elif generic_checklist:
         content.append({"type": "text", "text": GENERIC_VDM_CHECKLIST})
     content.append({"type": "text", "text": STRUCTURED_VDM_INSTRUCTIONS})
@@ -296,6 +330,9 @@ class Step3State:
     last_valid_motion_label: str = "NOT COMPLETE"
     last_motion_turn: int | None = None
     history: list[dict[str, Any]] = field(default_factory=list)
+    # Post-hoc gate-expiry bookkeeping (unused by the frozen behaviour).
+    consecutive_gated: int = 0
+    expired: bool = False
 
     def update_after_vdm(self, turn_idx: int, vdm_text: str) -> str:
         label = parse_verdict(vdm_text) or "UNCERTAIN"
@@ -305,6 +342,8 @@ class Step3State:
         self.last_valid_motion_label = label
         self.last_valid_motion_verdict = f"{line.strip() or 'Verdict: ' + label} (VDM after turn {turn_idx})"
         self.last_motion_turn = turn_idx
+        self.consecutive_gated = 0
+        self.expired = False
         return label
 
 
@@ -346,6 +385,54 @@ def gate_message(rec: dict[str, Any], state: Step3State) -> tuple[str, str]:
         )
         label = "NOT COMPLETE"
     return head + verdict, label
+
+
+def gate_message_with_expiry(rec: dict[str, Any], state: Step3State) -> tuple[str, str]:
+    """Post-hoc ``gate_only`` / ``ref_and_gate`` gate: a cached NOT COMPLETE claim expires.
+
+    The cached claim is not repeated when the gripper is closed around an object after the
+    zero-motion turn, or after one gated repeat. A state-aware diagnostic is returned instead.
+    """
+    state.consecutive_gated += 1
+    pa = rec.get("proprio_after") or {}
+    g = pa.get("gripper_opening")
+    holding = g is not None and HOLDING_OPENING_RANGE[0] < g < HOLDING_OPENING_RANGE[1]
+    stale_claim = state.last_motion_turn is not None and state.last_valid_motion_label == "NOT COMPLETE"
+    if not stale_claim or not (holding or state.consecutive_gated >= 2 or state.expired):
+        return gate_message(rec, state)
+
+    state.expired = True
+    if rec["exec_ok"]:
+        cause = "the code ran without exception but called no motion primitive"
+    else:
+        where = f" at line {rec['error_line']}" if rec["error_line"] is not None else ""
+        cause = f"execution failed{where}: {rec['exception']}"
+    z = (pa.get("eef_xyz") or [None, None, None])[2]
+    head = (
+        "Zero-Motion Gate: no robot motion primitive (move_to_joints / open_gripper / close_gripper) "
+        f"was executed this turn ({cause}). The scene is physically unchanged since the previous "
+        "observation, so no new visual assessment was requested.\n"
+        f"The earlier NOT COMPLETE verdict (VDM after turn {state.last_motion_turn}) has EXPIRED and is "
+        "not repeated, because it may be stale.\n"
+    )
+    if holding:
+        state_line = (
+            f"Current robot state: the gripper is closed at opening {g:.2f} (an object is between the "
+            f"fingers) with the end-effector at z = {z:+.3f} m. Zero motion occurred because {cause}; "
+            "a grasp-planning failure can mean the object is already held in the gripper.\n"
+        )
+        verdict = (
+            "Verdict: UNCERTAIN — Verify whether the goal is already met (e.g. inspect the current "
+            "observation and proprioception) before re-planning a grasp; do not open the gripper or "
+            "re-grasp an object that is already held."
+        )
+    else:
+        state_line = ""
+        verdict = (
+            "Verdict: UNCERTAIN — Repeated zero-motion turn. Verify the current state with perception and "
+            "fix the code before executing the manipulation."
+        )
+    return head + state_line + verdict, "UNCERTAIN"
 
 
 def compose_slot(mode: str, header: str | None, assessment: str) -> str:

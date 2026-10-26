@@ -71,7 +71,33 @@ def _budgeted_query(
     tele = get_active_telemetry()
     if tele is None:
         return _query_model(args, prompt)
+    replay = tele.replay.pop((purpose, turn_idx), None) if tele.replay else None
+    if replay is not None:
+        return tele.record_replayed(args, prompt, replay, role=role, purpose=purpose, turn_idx=turn_idx)
     return tele.query(_query_model, args, prompt, role=role, purpose=purpose, turn_idx=turn_idx)
+
+
+def _load_turn0_replay(source: str, include_turn0_vdm: bool) -> dict[tuple[str, int], dict[str, Any]]:
+    """Responses of the frozen episode's turn 0, keyed like ``_budgeted_query`` calls."""
+    ep = json.loads(open(source).read())
+    calls = {(c["purpose"], c["turn_idx"]): c for c in ep["model_calls"]}
+    t0 = ep["turns"][0]
+    wanted = {
+        ("vdm_initial", 0): t0["initial_scene_vdm"]["vdm_output"],
+        ("initial_code", 0): t0["generated_code"],
+    }
+    if include_turn0_vdm:
+        wanted[("vdm_diff_ours", 0)] = t0["vdm_output"]
+    out = {}
+    for key, content in wanted.items():
+        c = calls[key]
+        out[key] = {
+            "content": content,
+            "input_tokens": c["input_tokens"],
+            "output_tokens": c["output_tokens"],
+            "model_returned": c["model_returned"],
+        }
+    return out
 
 
 def _prompt_record(prompt: list[dict[str, Any]], image_names: list[str]) -> list[dict[str, Any]]:
@@ -455,17 +481,26 @@ def _get_step3_feedback(
     visual_feedback_base64_history: list[str],
     exec_record: dict[str, Any],
     step3_state: eg_vdm.Step3State,
+    posthoc_variant: str | None = None,
 ) -> str:
-    """Step 3 for ``ours`` / ``ablation``: build the feedback-slot text (see capx.envs.eg_vdm)."""
+    """Step 3 for ``ours`` / ``ablation``: build the feedback-slot text (see capx.envs.eg_vdm).
+
+    ``posthoc_variant`` (Phase 3 diagnostics, ``ours`` only) switches on the grasp-relative
+    reference frame and/or gate expiry; ``None`` is the frozen behaviour.
+    """
+    grasp_rel = eg_vdm.uses_grasp_reference(posthoc_variant)
     tele = get_active_telemetry()
     turn_idx = tele.num_code_executions - 1 if tele is not None else None
     n = len(visual_feedback_base64_history)
     image_names = [f"visual_feedback_{n - 2:02d}.png", f"visual_feedback_{n - 1:02d}.png"]
 
     if mode == "ours":
-        header = eg_vdm.format_exec_header(exec_record)
+        header = eg_vdm.format_exec_header(exec_record, grasp_relative=grasp_rel)
         if exec_record["num_motion_calls"] == 0:
-            assessment, label = eg_vdm.gate_message(exec_record, step3_state)
+            if eg_vdm.uses_gate_expiry(posthoc_variant):
+                assessment, label = eg_vdm.gate_message_with_expiry(exec_record, step3_state)
+            else:
+                assessment, label = eg_vdm.gate_message(exec_record, step3_state)
             if tele is not None:
                 tele.last_vdm = {
                     "purpose": "zero_motion_gate",
@@ -479,7 +514,7 @@ def _get_step3_feedback(
             return eg_vdm.compose_slot(mode, header, assessment)
         prompt = eg_vdm.structured_vdm_prompt(
             task_description, visual_feedback_base64_history[-2], visual_feedback_base64_history[-1],
-            exec_record=exec_record, generic_checklist=False,
+            exec_record=exec_record, generic_checklist=False, grasp_relative=grasp_rel,
         )
     elif mode == "ablation":
         header = eg_vdm.GENERIC_SLOT_HEADER
@@ -713,7 +748,7 @@ def _handle_multi_turn_step(
         else:
             differencing_feedback = _get_step3_feedback(
                 mode, visual_differencing_args, task_description, visual_feedback_base64_history,
-                exec_record, step3_state,
+                exec_record, step3_state, posthoc_variant=config.get("posthoc_variant"),
             )
         tele = get_active_telemetry()
         if tele is not None and tele.last_vdm is not None:
@@ -805,8 +840,24 @@ def _run_single_trial(
         vdm_model=args.visual_differencing_model
         if (config["use_img_differencing"] or use_video_diff)
         else None,
-        output_path=os.path.join(config["output_dir"], f"episode_{task_name}_seed{trial}_{mode}.json"),
+        output_path=os.path.join(
+            config["output_dir"],
+            f"episode_{task_name}_seed{trial}_{mode}"
+            + (f"_{config['posthoc_variant']}" if config.get("posthoc_variant") else "")
+            + ".json",
+        ),
     )
+    posthoc_variant = config.get("posthoc_variant")
+    if posthoc_variant is not None:
+        if mode != "ours" or posthoc_variant not in eg_vdm.POSTHOC_VARIANTS:
+            raise ValueError(f"posthoc variant {posthoc_variant!r} requires mode 'ours'")
+        tele.posthoc = {
+            "variant": posthoc_variant,
+            "replay_turn0_from": config.get("replay_turn0_from"),
+            "replay_turn0_vdm": bool(config.get("replay_turn0_vdm")),
+        }
+        if config.get("replay_turn0_from"):
+            tele.replay = _load_turn0_replay(config["replay_turn0_from"], bool(config.get("replay_turn0_vdm")))
     env.tool_wrapper = tele.wrap_tool
     if partial_artifacts is not None:
         partial_artifacts["telemetry"] = tele

@@ -1,0 +1,38 @@
+I'll start by getting the observation and segmenting the red cube to find its 3D position.
+
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+print("num masks", len(masks))
+for m in masks:
+    print(m.get("score"), m.get("box"))
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+print("mask sum", mask.sum())
+
+# backproject to 3D
+ys, xs = np.nonzero(mask)
+z = depth[ys, xs]
+valid = z > 0
+xs, ys, z = xs[valid], ys[valid], z[valid]
+fx, fy = K[0,0], K[1,1]
+cx, cy = K[0,2], K[1,2]
+X = (xs - cx) * z / fx
+Y = (ys - cy) * z / fy
+pts_cam = np.stack([X, Y, z], axis=1)
+# transform to world
+R = ext[:3,:3]; t = ext[:3,3]
+pts_world = (R @ pts_cam.T).T + t
+print("world mean", pts_world.mean(axis=0))
+print("world min", pts_world.min(axis=0))
+print("world max", pts_world.max(axis=0))
+obb = get_oriented_bounding_box_from_3d_points(pts_world)
+print("obb center", obb["center"])
+print("obb extent", obb["extent"])
+print("obb R", obb["R"])

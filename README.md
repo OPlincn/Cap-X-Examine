@@ -1,6 +1,8 @@
 
 
 
+> **Harness Assessment Submission Package:** See [**`README_SUBMISSION.md`**](README_SUBMISSION.md) for commit tags (`phase1`, `phase2-freeze`, `phase2-results`, `phase3-final`), uniform environment fixes (`E1–E5`), raw episode logs (`logs/`), and offline table reproduction instructions (`scripts/reproduce_all_tables.sh`).
+
 # CaP-X
 
 ### A Framework for Benchmarking and Improving Coding Agents for Robot Manipulation

@@ -48,3 +48,10 @@ wandb/
 *.webp
 check.md
 logs/services/
+reports/*.pdf
+reports/*.tex
+reports/*.md
+reports/figures/
+reports/generated/
+scripts/make_latex_tables*.py
+scripts/md_to_pdf_cn.py

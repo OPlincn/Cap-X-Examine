@@ -1,0 +1,714 @@
+{
+  "task_name": "cube_lifting",
+  "seed": 102,
+  "mode": "ours",
+  "initial_state": {
+    "seed": 102,
+    "qpos_sha256_16": "9a0a2d7c6df94f88",
+    "qpos": [
+      -0.021605,
+      0.206599,
+      0.017222,
+      -2.630895,
+      0.023849,
+      2.907682,
+      -2.313937,
+      0.008394,
+      -0.008383,
+      -0.023442,
+      -0.009267,
+      0.820247,
+      -0.768938,
+      0.0,
+      -0.0,
+      0.639323
+    ]
+  },
+  "coding_model": "deepseek-v4.1-flash-1017",
+  "vdm_model": "qwen3.8-flash",
+  "budget": {
+    "max_turns": 8,
+    "max_model_calls": 16,
+    "max_total_tokens": 60000,
+    "max_sim_steps": 1500,
+    "max_wall_time_s": 600,
+    "max_completion_tokens": 8192
+  },
+  "termination_reason": "finish",
+  "termination_detail": "coding agent answered FINISH",
+  "timeout_or_budget_exceeded": false,
+  "budget_exceeded": null,
+  "posthoc": {
+    "variant": "gate_only",
+    "replay_turn0_from": "logs/test_eval/cube_lifting/ours/seed_102/episode_cube_lifting_seed102_ours.json",
+    "replay_turn0_vdm": true
+  },
+  "turns": [
+    {
+      "turn_idx": 0,
+      "generated_code": "import numpy as np\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\next = cam[\"pose_mat\"]\n\nmasks = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\nbest = max(masks, key=lambda d: d[\"score\"])\nmask = best[\"mask\"].astype(np.int32)\n\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)\nbest_idx = int(np.argmax(grasp_scores))\nT_cam = grasp_poses[best_idx]\nT_world = ext @ T_cam\n\npos = T_world[:3, 3]\nR = T_world[:3, :3]\n\n# Convert rotation to quaternion (wxyz)\ndef rot_to_quat(R):\n    t = np.trace(R)\n    if t > 0:\n        s = np.sqrt(t + 1.0) * 2\n        w = 0.25 * s\n        x = (R[2,1] - R[1,2]) / s\n        y = (R[0,2] - R[2,0]) / s\n        z = (R[1,0] - R[0,1]) / s\n    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:\n        s = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2\n        w = (R[2,1] - R[1,2]) / s\n        x = 0.25 * s\n        y = (R[0,1] + R[1,0]) / s\n        z = (R[0,2] + R[2,0]) / s\n    elif R[1,1] > R[2,2]:\n        s = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2\n        w = (R[0,2] - R[2,0]) / s\n        x = (R[0,1] + R[1,0]) / s\n        y = 0.25 * s\n        z = (R[1,2] + R[2,1]) / s\n    else:\n        s = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2\n        w = (R[1,0] - R[0,1]) / s\n        x = (R[0,2] + R[2,0]) / s\n        y = (R[1,2] + R[2,1]) / s\n        z = 0.25 * s\n    return np.array([w, x, y, z])\n\nquat = rot_to_quat(R)\nquat = quat / np.linalg.norm(quat)\n\n# Approach from above\npre_pos = pos + np.array([0, 0, 0.1])\nopen_gripper()\njoints = solve_ik(pre_pos, quat)\nmove_to_joints(joints)\n\njoints = solve_ik(pos, quat)\nmove_to_joints(joints)\n\nclose_gripper()\n\nlift_pos = pos + np.array([0, 0, 0.15])\njoints = solve_ik(lift_pos, quat)\nmove_to_joints(joints)\nprint(\"done\")",
+      "generated_by_call": 1,
+      "stdout": "done\n",
+      "stderr": "",
+      "code_exec_success": true,
+      "exec_wall_time": 3.2173538208007812,
+      "sim_steps_delta": 212,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 1,
+        "plan_grasp": 1,
+        "open_gripper": 1,
+        "solve_ik": 3,
+        "move_to_joints": 3,
+        "close_gripper": 1
+      },
+      "exec_record": {
+        "exec_ok": true,
+        "exception": null,
+        "error_line": null,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 1,
+          "plan_grasp": 1,
+          "open_gripper": 1,
+          "solve_ik": 3,
+          "move_to_joints": 3,
+          "close_gripper": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 3,
+          "open_gripper": 1,
+          "close_gripper": 1
+        },
+        "num_motion_calls": 5,
+        "sim_steps_delta": 212,
+        "proprio_before": {
+          "eef_xyz": [
+            0.4341,
+            -0.0031,
+            0.1841
+          ],
+          "gripper_opening": 0.21
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.5175,
+            -0.0286,
+            0.1469
+          ],
+          "gripper_opening": 0.428
+        },
+        "gripper_events": [
+          {
+            "turn_idx": 0,
+            "call": "open_gripper",
+            "eef_xyz": [
+              0.4414,
+              -0.0032,
+              0.1963
+            ],
+            "gripper_opening": 0.987
+          },
+          {
+            "turn_idx": 0,
+            "call": "close_gripper",
+            "eef_xyz": [
+              0.5169,
+              -0.0295,
+              0.0032
+            ],
+            "gripper_opening": 0.356
+          }
+        ]
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.4341,
+          -0.0031,
+          0.1841
+        ],
+        "gripper_opening": 0.21
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.5175,
+          -0.0286,
+          0.1469
+        ],
+        "gripper_opening": 0.428
+      },
+      "turn_eval_success": true,
+      "turn_eval_reward": 1.0,
+      "vdm_prompt": [
+        {
+          "role": "system",
+          "content": "You are a visual verification module for a robot manipulation agent. You compare the previous and current camera images of the workspace, with the goal of the task in mind, and report objectively what physically changed and whether the task is complete. Do *NOT* write any code."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are controlling a Franka Emika robot with API described below.\nGoal: pick up the red cube and lift it.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will receive the current console stdout and stderr (any errors or print statements made in the code). You will then have the chance to write new code to query the environment state and/or complete the task.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+            },
+            {
+              "type": "text",
+              "text": "Previous state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_00.png"
+            },
+            {
+              "type": "text",
+              "text": "Current state (main camera):"
+            },
+            {
+              "type": "image",
+              "file": "visual_feedback_01.png"
+            },
+            {
+              "type": "text",
+              "text": "Execution record of the robot turn that happened between the two images (measured by the robot itself; it does not tell you whether the goal was achieved):\n[Execution & Proprioception Record]\n- Code execution: completed without exception\n- Robot motion calls this turn: move_to_joints\u00d73, open_gripper\u00d71, close_gripper\u00d71\n- Perception/planning calls this turn: get_observation\u00d71, segment_sam3_text_prompt\u00d71, plan_grasp\u00d71, solve_ik\u00d73\n- Simulator steps this turn: 212\n- End-effector xyz (robot base frame, m): before [+0.434, -0.003, +0.184] -> after [+0.517, -0.029, +0.147] (\u0394 [+0.083, -0.025, -0.037])\n- Gripper opening (1.0 = fully open, 0.0 = fully closed with nothing between the fingers): before 0.21 -> after 0.43\n- Gripper opening right after each gripper command: open_gripper -> 0.99 (EEF z +0.196); close_gripper -> 0.36 (EEF z +0.003)\nConsole stdout printed by the robot's code:\n```\ndone\n```\nThe record shows what the robot did, not what resulted: a grasp can miss and an object can slip or be placed beside its target. Judge the outcome from the images together with the proprioceptive readings, never from what the robot may have intended. A gripper opening near 0.0 right after close_gripper means the fingers closed fully with nothing between them; an opening that stays clearly above 0.0 after close_gripper means something is between the fingers."
+            },
+            {
+              "type": "text",
+              "text": "Compare the previous state image with the current state image and answer in exactly this format:\nPhysical Change: <what moved or changed between the two images; say 'none' if nothing changed>\nGripper & Occlusion Check: <is the gripper open or closed, is it holding an object, is any object occluded by the arm, and what is the vertical/stacking relation between the task objects>\nVerdict: <COMPLETE | NOT COMPLETE | UNCERTAIN> \u2014 <one-sentence evidence for the verdict>\nUse UNCERTAIN when the images do not allow a confident judgement (for example height or stacking order that is ambiguous from a single 2D view)."
+            }
+          ]
+        }
+      ],
+      "vdm_output": "Physical Change: The robot arm has moved down and forward to approach the red cube, which was previously resting on the table.\nGripper & Occlusion Check: The gripper is currently closed around the red cube (indicated by the fingers clamping the object). The red cube is partially occluded by the gripper but is clearly grasped.\nVerdict: NOT COMPLETE \u2014 The robot has successfully grasped the red cube, but it has not yet lifted it significantly off the surface; the end-effector z-position is low (+0.145m), indicating the lift phase of the task is pending.",
+      "vdm_call_index": 2,
+      "vdm_skipped_by_gate": false,
+      "vdm_verdict": "NOT COMPLETE",
+      "vdm_verdict_source": "structured",
+      "step3_feedback": "[Execution & Proprioception Record]\n- Code execution: completed without exception\n- Robot motion calls this turn: move_to_joints\u00d73, open_gripper\u00d71, close_gripper\u00d71\n- Perception/planning calls this turn: get_observation\u00d71, segment_sam3_text_prompt\u00d71, plan_grasp\u00d71, solve_ik\u00d73\n- Simulator steps this turn: 212\n- End-effector xyz (robot base frame, m): before [+0.434, -0.003, +0.184] -> after [+0.517, -0.029, +0.147] (\u0394 [+0.083, -0.025, -0.037])\n- Gripper opening (1.0 = fully open, 0.0 = fully closed with nothing between the fingers): before 0.21 -> after 0.43\n- Gripper opening right after each gripper command: open_gripper -> 0.99 (EEF z +0.196); close_gripper -> 0.36 (EEF z +0.003)\n[Visual Differencing Assessment]\nPhysical Change: The robot arm has moved down and forward to approach the red cube, which was previously resting on the table.\nGripper & Occlusion Check: The gripper is currently closed around the red cube (indicated by the fingers clamping the object). The red cube is partially occluded by the gripper but is clearly grasped.\nVerdict: NOT COMPLETE \u2014 The robot has successfully grasped the red cube, but it has not yet lifted it significantly off the surface; the end-effector z-position is low (+0.145m), indicating the lift phase of the task is pending.",
+      "decision_after": "regenerate",
+      "decision_call_index": 3,
+      "initial_scene_vdm": {
+        "purpose": "vdm_initial",
+        "vdm_prompt": [
+          {
+            "role": "system",
+            "content": "You are a helpful assistant that describes the initial state of the environment with the goal of the task in mind. You should try to provide objective information and no assumptions. Do *NOT* write any code."
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "You are controlling a Franka Emika robot with API described below.\nGoal: pick up the red cube and lift it.\nYou may write python code comments for reasoning but ONLY write the executable Python code and do not write it in code fences.\nAfter this code executes, you will receive the current console stdout and stderr (any errors or print statements made in the code). You will then have the chance to write new code to query the environment state and/or complete the task.\nThe functions (APIs) below are already imported to the environment. If you want to use numpy, you need to import it explicitly.\n\nAPIs:\n\nget_observation() -> dict[str, typing.Any]\n  Doc:\n    Get the observation of the environment.\n    Returns:\n        observation:\n            A dictionary containing the observation of the environment.\n            The dictionary contains the following keys:\n            - [\"robot0_robotview\"][\"images\"][\"rgb\"]: Current color camera image as a numpy array of shape (H, W, 3), dtype uint8.\n            - [\"robot0_robotview\"][\"images\"][\"depth\"]: Current depth camera image as a numpy array of shape (H, W), dtype float32.\n            - [\"robot0_robotview\"][\"intrinsics\"]: Camera intrinsic matrix as a numpy array of shape (3, 3), dtype float64.\n            - [\"robot0_robotview\"][\"pose_mat\"]: Camera extrinsic matrix as a numpy array of shape (4, 4), dtype float64.\n\nsegment_sam3_text_prompt(rgb: numpy.ndarray, text_prompt: str) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image conditioned on a text prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        text_prompt:\n            Text prompt for SAM3 segmentation.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"box\": list [x1, y1, x2, y2] in pixel coordinates.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3(rgb, text_prompt=\"red mug\")\n\nsegment_sam3_point_prompt(rgb: numpy.ndarray, point_coords: tuple[float, float]) -> list[dict[str, typing.Any]]\n  Doc:\n    Run SAM3 segmentation on an RGB image, optionally conditioned on an image coordinate point prompt.\n    \n    Args:\n        rgb:\n            RGB image array of shape (H, W, 3), dtype uint8.\n        point_coords:\n            (x, y) pixel coordinates of the point prompt.\n    \n    Returns:\n        masks:\n            A list of dictionaries. Each dict may contain:\n    \n              - \"mask\":  np.ndarray of shape (H, W), dtype bool,\n                          where True means the pixel belongs to the instance.\n              - \"score\": float confidence score.\n    \n    Example:\n        >>> rgb = obs[\"robot0_robotview\"][\"images\"][\"rgb\"]\n        >>> masks = segment_sam3_point_prompt(rgb, (100, 100))\n\nplan_grasp(depth: numpy.ndarray, intrinsics: numpy.ndarray, segmentation: numpy.ndarray) -> tuple[numpy.ndarray, numpy.ndarray]\n  Doc:\n    Plan grasp candidates using Contact-GraspNet for a single instance.\n    \n    This is a thin wrapper around the Contact-GraspNet planner. It does not\n    apply any camera/world transforms or TCP offsets: the caller is\n    responsible for transforming the resulting grasp poses into the desired\n    frame and applying TCP offsets if necessary.\n    \n    Args:\n        depth:\n            Depth image in meters.\n            Shape: (H, W), dtype float32/float64.\n        intrinsics:\n            Camera intrinsic matrix.\n            Shape: (3, 3), dtype float64.\n        segmentation:\n            Instance segmentation map where each integer > 0 corresponds to a\n            unique object instance ID.\n            Shape: (H, W) or (H, W, 1), dtype int32/int64.\n    \n    Returns:\n        grasp_poses:\n            np.ndarray of shape (K, 4, 4), dtype float64.\n            Homogeneous transforms for each candidate grasp IN THE CAMERA FRAME.\n        grasp_scores:\n            np.ndarray of shape (K,), dtype float64.\n            Confidence score for each candidate grasp.\n    \n    Example:\n        >>> cam = obs[\"robot0_robotview\"]\n        >>> rgb = cam[\"images\"][\"rgb\"]\n        >>> depth = cam[\"images\"][\"depth\"]\n        >>> sam3_results = sam3_seg_fn(rgb, text_prompt=\"red mug\")\n        >>> best = max(sam3_results, key=lambda d: d[\"score\"])\n        >>> mask = best[\"mask\"]\n        >>> K = cam[\"intrinsics\"]\n        >>> grasp_poses, grasp_scores = plan_grasp(\n        ...     depth=depth,\n        ...     intrinsics=K,\n        ...     segmentation=mask,\n        ... )\n        >>> best_idx = grasp_scores.argmax()\n        >>> best_T = grasp_poses[best_idx]  # (4, 4)\n        >>> camera_extrinsics = cam[\"pose_mat\"]\n        >>> grasp_sample_world_frame = camera_extrinsics @ best_T\n\nget_oriented_bounding_box_from_3d_points(points: numpy.ndarray) -> dict[str, typing.Any]\n  Doc:\n    Get the oriented bounding box from 3D points.\n    \n    Args:\n        points: np.ndarray: The 3D points to get the oriented bounding box from.\n            Shape: (N, 3), dtype float64.\n    \n    Returns:\n        dict[str, Any]: The oriented bounding box. The dictionary contains the following keys:\n            - \"center\": np.ndarray: The center of the oriented bounding box in point cloud frame.\n            - \"extent\": np.ndarray: The extent of the oriented bounding box.\n            - \"R\": np.ndarray: The rotation matrix of the oriented bounding box in point cloud frame.\n    \n    Example:\n        >>> points = np.random.randn((100, 3))\n        >>> obb = get_oriented_bounding_box_from_3d_points(points)\n\nsolve_ik(position: numpy.ndarray, quaternion_wxyz: numpy.ndarray) -> numpy.ndarray\n  Doc:\n    Solve inverse kinematics for the panda_hand link.\n    \n    Args:\n        position:\n            Target position in world frame.\n            Shape: (3,), dtype float64.\n        quaternion_wxyz:\n            Target orientation as a unit quaternion in world frame.\n            Shape: (4,), [w, x, y, z], dtype float64.\n    \n    Returns:\n        joints:\n            np.ndarray of shape (7,), dtype float64.\n            Joint angles for the 7 DoF Franka arm.\n    \n    Example:\n        >>> target_pos = np.array([0.5, 0.0, 0.3])\n        >>> target_quat = np.array([1.0, 0.0, 0.0, 0.0])  # identity, wxyz\n        >>> joints = solve_ik(target_pos, target_quat)\n        >>> move_to_joints(joints)\n\nmove_to_joints(joints: numpy.ndarray) -> None\n  Doc:\n    Move the robot to a given joint configuration in a blocking manner.\n    \n    Args:\n        joints:\n            Target joint angles for the 7-DoF Franka arm.\n            Shape: (7,), dtype float64.\n    \n    Returns:\n        None\n    \n    Example:\n        >>> joints = np.array([0.0, -0.5, 0.0, -2.0, 0.0, 1.5, 0.8])\n        >>> move_to_joints(joints)\n\nopen_gripper() -> None\n  Doc:\n    Open gripper fully.\n    \n    Args:\n        None\n\nclose_gripper() -> None\n  Doc:\n    Close gripper fully.\n    \n    Args:\n        None"
+              },
+              {
+                "type": "text",
+                "text": "Describe the initial state of the environment with the goal of the task in mind. You should try to provide objective information and no assumptions. Do *NOT* write any code."
+              },
+              {
+                "type": "text",
+                "text": "Main camera view:"
+              },
+              {
+                "type": "image",
+                "file": "visual_feedback_00.png"
+              }
+            ]
+          }
+        ],
+        "vdm_output": "The environment shows a Franka Emika robot arm positioned above a white surface. A red cube is visible on the surface, located centrally in the camera's field of view but slightly below the center vertically. The robot gripper appears to be open and is positioned at the top of the frame, indicating it is currently retracted or in a home-like position relative to the workspace. The background consists of a tiled floor area behind the white surface. The lighting is uniform, casting minimal shadows.",
+        "vdm_call_index": 0
+      },
+      "decision_raw_response": null,
+      "turn_wall_time": 8.082481861114502
+    },
+    {
+      "turn_idx": 1,
+      "generated_code": "import numpy as np\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\next = cam[\"pose_mat\"]\n\nmasks = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\nbest = max(masks, key=lambda d: d[\"score\"])\nmask = best[\"mask\"].astype(np.int32)\n\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)\nbest_idx = int(np.argmax(grasp_scores))\nT_cam = grasp_poses[best_idx]\nT_world = ext @ T_cam\n\npos = T_world[:3, 3]\nR = T_world[:3, :3]\n\ndef rot_to_quat(R):\n    t = np.trace(R)\n    if t > 0:\n        s = np.sqrt(t + 1.0) * 2\n        w = 0.25 * s\n        x = (R[2,1] - R[1,2]) / s\n        y = (R[0,2] - R[2,0]) / s\n        z = (R[1,0] - R[0,1]) / s\n    elif R[0,0] > R[1,1] and R[0,0] > R[2,2]:\n        s = np.sqrt(1.0 + R[0,0] - R[1,1] - R[2,2]) * 2\n        w = (R[2,1] - R[1,2]) / s\n        x = 0.25 * s\n        y = (R[0,1] + R[1,0]) / s\n        z = (R[0,2] + R[2,0]) / s\n    elif R[1,1] > R[2,2]:\n        s = np.sqrt(1.0 + R[1,1] - R[0,0] - R[2,2]) * 2\n        w = (R[0,2] - R[2,0]) / s\n        x = (R[0,1] + R[1,0]) / s\n        y = 0.25 * s\n        z = (R[1,2] + R[2,1]) / s\n    else:\n        s = np.sqrt(1.0 + R[2,2] - R[0,0] - R[1,1]) * 2\n        w = (R[1,0] - R[0,1]) / s\n        x = (R[0,2] + R[2,0]) / s\n        y = (R[1,2] + R[2,1]) / s\n        z = 0.25 * s\n    return np.array([w, x, y, z])\n\nquat = rot_to_quat(R)\nquat = quat / np.linalg.norm(quat)\n\n# Lift higher\nlift_pos = pos + np.array([0, 0, 0.25])\njoints = solve_ik(lift_pos, quat)\nmove_to_joints(joints)\nprint(\"lifted\")",
+      "generated_by_call": 3,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py\", line 196, in _exec_user_code\n    exec(code, self._exec_globals, self._exec_globals)\n  File \"<string>\", line 13, in <module>\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/telemetry.py\", line 363, in wrapper\n    result = fn(*a, **kw)\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/integrations/franka/control_reduced.py\", line 434, in plan_grasp\n    vtf.SE3.from_matrix(self._env.grasp_sample) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/.venv/lib/python3.10/site-packages/viser/transforms/_se3.py\", line 92, in from_matrix\n    assert matrix.shape[-2:] == (4, 4) or matrix.shape[-2:] == (3, 4)\nAssertionError\n",
+      "code_exec_success": false,
+      "exec_wall_time": 12.82652497291565,
+      "sim_steps_delta": 0,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 1,
+        "plan_grasp": 1
+      },
+      "exec_record": {
+        "exec_ok": false,
+        "exception": "AssertionError",
+        "error_line": 13,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 1,
+          "plan_grasp": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 0,
+          "open_gripper": 0,
+          "close_gripper": 0
+        },
+        "num_motion_calls": 0,
+        "sim_steps_delta": 0,
+        "proprio_before": {
+          "eef_xyz": [
+            0.5175,
+            -0.0286,
+            0.1469
+          ],
+          "gripper_opening": 0.428
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.5175,
+            -0.0286,
+            0.1469
+          ],
+          "gripper_opening": 0.428
+        },
+        "gripper_events": []
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.5175,
+          -0.0286,
+          0.1469
+        ],
+        "gripper_opening": 0.428
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.5175,
+          -0.0286,
+          0.1469
+        ],
+        "gripper_opening": 0.428
+      },
+      "turn_eval_success": true,
+      "turn_eval_reward": 1.0,
+      "vdm_prompt": null,
+      "vdm_output": "Zero-Motion Gate: no robot motion primitive (move_to_joints / open_gripper / close_gripper) was executed this turn (execution failed at line 13: AssertionError). The scene is physically unchanged since the previous observation, so no new visual assessment was requested.\nThe earlier NOT COMPLETE verdict (VDM after turn 0) has EXPIRED and is not repeated, because it may be stale.\nCurrent robot state: the gripper is closed at opening 0.43 (an object is between the fingers) with the end-effector at z = +0.147 m. Zero motion occurred because execution failed at line 13: AssertionError; a grasp-planning failure can mean the object is already held in the gripper.\nVerdict: UNCERTAIN \u2014 Verify whether the goal is already met (e.g. inspect the current observation and proprioception) before re-planning a grasp; do not open the gripper or re-grasp an object that is already held.",
+      "vdm_call_index": null,
+      "vdm_skipped_by_gate": true,
+      "vdm_verdict": "UNCERTAIN",
+      "vdm_verdict_source": "gate",
+      "step3_feedback": "[Execution & Proprioception Record]\n- Code execution: FAILED at line 13: AssertionError\n- Robot motion calls this turn: none\n- Perception/planning calls this turn: get_observation\u00d71, segment_sam3_text_prompt\u00d71, plan_grasp\u00d71\n- Simulator steps this turn: 0\n- End-effector xyz (robot base frame, m): before [+0.517, -0.029, +0.147] -> after [+0.517, -0.029, +0.147] (\u0394 [+0.000, +0.000, +0.000])\n- Gripper opening (1.0 = fully open, 0.0 = fully closed with nothing between the fingers): before 0.43 -> after 0.43\n[Visual Differencing Assessment]\nZero-Motion Gate: no robot motion primitive (move_to_joints / open_gripper / close_gripper) was executed this turn (execution failed at line 13: AssertionError). The scene is physically unchanged since the previous observation, so no new visual assessment was requested.\nThe earlier NOT COMPLETE verdict (VDM after turn 0) has EXPIRED and is not repeated, because it may be stale.\nCurrent robot state: the gripper is closed at opening 0.43 (an object is between the fingers) with the end-effector at z = +0.147 m. Zero motion occurred because execution failed at line 13: AssertionError; a grasp-planning failure can mean the object is already held in the gripper.\nVerdict: UNCERTAIN \u2014 Verify whether the goal is already met (e.g. inspect the current observation and proprioception) before re-planning a grasp; do not open the gripper or re-grasp an object that is already held.",
+      "decision_after": "regenerate",
+      "decision_call_index": 4,
+      "decision_raw_response": null,
+      "turn_wall_time": 15.417278051376343
+    },
+    {
+      "turn_idx": 2,
+      "generated_code": "import numpy as np\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\next = cam[\"pose_mat\"]\n\nmasks = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\nbest = max(masks, key=lambda d: d[\"score\"])\nmask = best[\"mask\"].astype(np.int32)\n\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)\nprint(\"num grasps:\", len(grasp_poses), \"scores:\", grasp_scores)\nprint(\"grasp_poses shape:\", np.asarray(grasp_poses).shape)",
+      "generated_by_call": 4,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py\", line 196, in _exec_user_code\n    exec(code, self._exec_globals, self._exec_globals)\n  File \"<string>\", line 13, in <module>\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/telemetry.py\", line 363, in wrapper\n    result = fn(*a, **kw)\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/integrations/franka/control_reduced.py\", line 434, in plan_grasp\n    vtf.SE3.from_matrix(self._env.grasp_sample) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/.venv/lib/python3.10/site-packages/viser/transforms/_se3.py\", line 92, in from_matrix\n    assert matrix.shape[-2:] == (4, 4) or matrix.shape[-2:] == (3, 4)\nAssertionError\n",
+      "code_exec_success": false,
+      "exec_wall_time": 12.652087211608887,
+      "sim_steps_delta": 0,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 1,
+        "plan_grasp": 1
+      },
+      "exec_record": {
+        "exec_ok": false,
+        "exception": "AssertionError",
+        "error_line": 13,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 1,
+          "plan_grasp": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 0,
+          "open_gripper": 0,
+          "close_gripper": 0
+        },
+        "num_motion_calls": 0,
+        "sim_steps_delta": 0,
+        "proprio_before": {
+          "eef_xyz": [
+            0.5175,
+            -0.0286,
+            0.1469
+          ],
+          "gripper_opening": 0.428
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.5175,
+            -0.0286,
+            0.1469
+          ],
+          "gripper_opening": 0.428
+        },
+        "gripper_events": []
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.5175,
+          -0.0286,
+          0.1469
+        ],
+        "gripper_opening": 0.428
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.5175,
+          -0.0286,
+          0.1469
+        ],
+        "gripper_opening": 0.428
+      },
+      "turn_eval_success": true,
+      "turn_eval_reward": 1.0,
+      "vdm_prompt": null,
+      "vdm_output": "Zero-Motion Gate: no robot motion primitive (move_to_joints / open_gripper / close_gripper) was executed this turn (execution failed at line 13: AssertionError). The scene is physically unchanged since the previous observation, so no new visual assessment was requested.\nThe earlier NOT COMPLETE verdict (VDM after turn 0) has EXPIRED and is not repeated, because it may be stale.\nCurrent robot state: the gripper is closed at opening 0.43 (an object is between the fingers) with the end-effector at z = +0.147 m. Zero motion occurred because execution failed at line 13: AssertionError; a grasp-planning failure can mean the object is already held in the gripper.\nVerdict: UNCERTAIN \u2014 Verify whether the goal is already met (e.g. inspect the current observation and proprioception) before re-planning a grasp; do not open the gripper or re-grasp an object that is already held.",
+      "vdm_call_index": null,
+      "vdm_skipped_by_gate": true,
+      "vdm_verdict": "UNCERTAIN",
+      "vdm_verdict_source": "gate",
+      "step3_feedback": "[Execution & Proprioception Record]\n- Code execution: FAILED at line 13: AssertionError\n- Robot motion calls this turn: none\n- Perception/planning calls this turn: get_observation\u00d71, segment_sam3_text_prompt\u00d71, plan_grasp\u00d71\n- Simulator steps this turn: 0\n- End-effector xyz (robot base frame, m): before [+0.517, -0.029, +0.147] -> after [+0.517, -0.029, +0.147] (\u0394 [+0.000, +0.000, +0.000])\n- Gripper opening (1.0 = fully open, 0.0 = fully closed with nothing between the fingers): before 0.43 -> after 0.43\n[Visual Differencing Assessment]\nZero-Motion Gate: no robot motion primitive (move_to_joints / open_gripper / close_gripper) was executed this turn (execution failed at line 13: AssertionError). The scene is physically unchanged since the previous observation, so no new visual assessment was requested.\nThe earlier NOT COMPLETE verdict (VDM after turn 0) has EXPIRED and is not repeated, because it may be stale.\nCurrent robot state: the gripper is closed at opening 0.43 (an object is between the fingers) with the end-effector at z = +0.147 m. Zero motion occurred because execution failed at line 13: AssertionError; a grasp-planning failure can mean the object is already held in the gripper.\nVerdict: UNCERTAIN \u2014 Verify whether the goal is already met (e.g. inspect the current observation and proprioception) before re-planning a grasp; do not open the gripper or re-grasp an object that is already held.",
+      "decision_after": "regenerate",
+      "decision_call_index": 5,
+      "decision_raw_response": null,
+      "turn_wall_time": 15.074393272399902
+    },
+    {
+      "turn_idx": 3,
+      "generated_code": "import numpy as np\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\next = cam[\"pose_mat\"]\n\nmasks = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\nbest = max(masks, key=lambda d: d[\"score\"])\nmask = best[\"mask\"].astype(np.int32)\n\ngrasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)\nprint(\"num grasps:\", len(grasp_poses), \"scores:\", grasp_scores)\nprint(\"grasp_poses shape:\", np.asarray(grasp_poses).shape)",
+      "generated_by_call": 5,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/tasks/base.py\", line 196, in _exec_user_code\n    exec(code, self._exec_globals, self._exec_globals)\n  File \"<string>\", line 13, in <module>\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/envs/telemetry.py\", line 363, in wrapper\n    result = fn(*a, **kw)\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/capx/integrations/franka/control_reduced.py\", line 434, in plan_grasp\n    vtf.SE3.from_matrix(self._env.grasp_sample) @ vtf.SE3.from_translation(np.array([0, 0, 0.12]))\n  File \"/home/oplin/PythonProjects/cap-task/cap-x/.venv/lib/python3.10/site-packages/viser/transforms/_se3.py\", line 92, in from_matrix\n    assert matrix.shape[-2:] == (4, 4) or matrix.shape[-2:] == (3, 4)\nAssertionError\n",
+      "code_exec_success": false,
+      "exec_wall_time": 12.756894588470459,
+      "sim_steps_delta": 0,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 1,
+        "plan_grasp": 1
+      },
+      "exec_record": {
+        "exec_ok": false,
+        "exception": "AssertionError",
+        "error_line": 13,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 1,
+          "plan_grasp": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 0,
+          "open_gripper": 0,
+          "close_gripper": 0
+        },
+        "num_motion_calls": 0,
+        "sim_steps_delta": 0,
+        "proprio_before": {
+          "eef_xyz": [
+            0.5175,
+            -0.0286,
+            0.1469
+          ],
+          "gripper_opening": 0.428
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.5175,
+            -0.0286,
+            0.1469
+          ],
+          "gripper_opening": 0.428
+        },
+        "gripper_events": []
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.5175,
+          -0.0286,
+          0.1469
+        ],
+        "gripper_opening": 0.428
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.5175,
+          -0.0286,
+          0.1469
+        ],
+        "gripper_opening": 0.428
+      },
+      "turn_eval_success": true,
+      "turn_eval_reward": 1.0,
+      "vdm_prompt": null,
+      "vdm_output": "Zero-Motion Gate: no robot motion primitive (move_to_joints / open_gripper / close_gripper) was executed this turn (execution failed at line 13: AssertionError). The scene is physically unchanged since the previous observation, so no new visual assessment was requested.\nThe earlier NOT COMPLETE verdict (VDM after turn 0) has EXPIRED and is not repeated, because it may be stale.\nCurrent robot state: the gripper is closed at opening 0.43 (an object is between the fingers) with the end-effector at z = +0.147 m. Zero motion occurred because execution failed at line 13: AssertionError; a grasp-planning failure can mean the object is already held in the gripper.\nVerdict: UNCERTAIN \u2014 Verify whether the goal is already met (e.g. inspect the current observation and proprioception) before re-planning a grasp; do not open the gripper or re-grasp an object that is already held.",
+      "vdm_call_index": null,
+      "vdm_skipped_by_gate": true,
+      "vdm_verdict": "UNCERTAIN",
+      "vdm_verdict_source": "gate",
+      "step3_feedback": "[Execution & Proprioception Record]\n- Code execution: FAILED at line 13: AssertionError\n- Robot motion calls this turn: none\n- Perception/planning calls this turn: get_observation\u00d71, segment_sam3_text_prompt\u00d71, plan_grasp\u00d71\n- Simulator steps this turn: 0\n- End-effector xyz (robot base frame, m): before [+0.517, -0.029, +0.147] -> after [+0.517, -0.029, +0.147] (\u0394 [+0.000, +0.000, +0.000])\n- Gripper opening (1.0 = fully open, 0.0 = fully closed with nothing between the fingers): before 0.43 -> after 0.43\n[Visual Differencing Assessment]\nZero-Motion Gate: no robot motion primitive (move_to_joints / open_gripper / close_gripper) was executed this turn (execution failed at line 13: AssertionError). The scene is physically unchanged since the previous observation, so no new visual assessment was requested.\nThe earlier NOT COMPLETE verdict (VDM after turn 0) has EXPIRED and is not repeated, because it may be stale.\nCurrent robot state: the gripper is closed at opening 0.43 (an object is between the fingers) with the end-effector at z = +0.147 m. Zero motion occurred because execution failed at line 13: AssertionError; a grasp-planning failure can mean the object is already held in the gripper.\nVerdict: UNCERTAIN \u2014 Verify whether the goal is already met (e.g. inspect the current observation and proprioception) before re-planning a grasp; do not open the gripper or re-grasp an object that is already held.",
+      "decision_after": "regenerate",
+      "decision_call_index": 6,
+      "decision_raw_response": null,
+      "turn_wall_time": 14.957051515579224
+    },
+    {
+      "turn_idx": 4,
+      "generated_code": "import numpy as np\nobs = get_observation()\ncam = obs[\"robot0_robotview\"]\nrgb = cam[\"images\"][\"rgb\"]\ndepth = cam[\"images\"][\"depth\"]\nK = cam[\"intrinsics\"]\next = cam[\"pose_mat\"]\n\nmasks = segment_sam3_text_prompt(rgb, text_prompt=\"red cube\")\nprint(\"num masks:\", len(masks))\nfor m in masks:\n    print(\"score:\", m.get(\"score\"), \"box:\", m.get(\"box\"), \"mask sum:\", int(np.sum(m[\"mask\"])))",
+      "generated_by_call": 6,
+      "stdout": "num masks: 200\nscore: 0.185546875 box: [220.87469482421875, 145.61631774902344, 278.1267395019531, 203.1288299560547] mask sum: 1245\nscore: 0.0164794921875 box: [140.8294677734375, -3.8921127319335938, 372.81903076171875, 199.107666015625] mask sum: 24916\nscore: 0.01611328125 box: [240.281982421875, 170.81956481933594, 268.84375, 196.29908752441406] mask sum: 457\nscore: 0.015625 box: [220.9403076171875, 145.2095184326172, 278.44342041015625, 202.7843780517578] mask sum: 1221\nscore: 0.01513671875 box: [141.4410400390625, 3.9448013305664062, 371.749267578125, 111.77824401855469] mask sum: 14492\nscore: 0.01312255859375 box: [33.82746887207031, 6.1338348388671875, 376.95233154296875, 501.7613525390625] mask sum: 185799\nscore: 0.01263427734375 box: [220.6851806640625, 144.9744415283203, 238.93917846679688, 200.35899353027344] mask sum: 656\nscore: 0.01202392578125 box: [13.260040283203125, -2.772491455078125, 377.3155517578125, 496.0094909667969] mask sum: 189930\nscore: 0.01202392578125 box: [220.5716094970703, 145.05442810058594, 243.1725311279297, 201.3467559814453] mask sum: 757\nscore: 0.0113525390625 box: [219.71017456054688, 14.80451774597168, 251.44671630859375, 28.82081413269043] mask sum: 216\nscore: 0.00909423828125 box: [208.80979919433594, 110.55728149414062, 490.63079833984375, 501.4783630371094] mask sum: 2965\nscore: 0.0087890625 box: [13.687652587890625, 0.803436279296875, 378.0888366699219, 406.6627502441406] mask sum: 70059\nscore: 0.0087890625 box: [219.96609497070312, 145.83253479003906, 236.22677612304688, 198.90480041503906] mask sum: 514\nscore: 0.00872802734375 box: [188.78675842285156, 38.594974517822266, 207.5640411376953, 69.72946166992188] mask sum: 402\nscore: 0.0081787109375 box: [179.37545776367188, 19.439041137695312, 357.9412536621094, 110.15731811523438] mask sum: 6991\nscore: 0.008056640625 box: [108.37141418457031, 18.769805908203125, 394.66357421875, 497.2088317871094] mask sum: 86510\nscore: 0.0079345703125 box: [233.43756103515625, 172.31858825683594, 277.7657775878906, 201.5328826904297] mask sum: 587\nscore: 0.0078125 box: [132.73019409179688, -47.5286865234375, 373.9504089355469, 383.6234130859375] mask sum: 35243\nscore: 0.0078125 box: [172.6775665283203, 68.23285675048828, 287.80889892578125, 202.860107421875] mask sum: 6451\nscore: 0.007476806640625 box: [184.74453735351562, 35.10492706298828, 338.3086853027344, 202.9278564453125] mask sum: 9064\nscore: 0.007476806640625 box: [209.1273956298828, 118.68719482421875, 487.10723876953125, 505.65728759765625] mask sum: 28598\nscore: 0.00714111328125 box: [170.6224822998047, 67.7681655883789, 285.65380859375, 203.57907104492188] mask sum: 6016\nscore: 0.00714111328125 box: [-4.1738739013671875, 105.51950073242188, 300.8740234375, 365.04400634765625] mask sum: 20684\nscore: 0.006927490234375 box: [337.7873229980469, 44.59502029418945, 347.3401794433594, 73.83969116210938] mask sum: 187\nscore: 0.006927490234375 box: [208.47898864746094, 84.70292663574219, 505.06103515625, 379.505859375] mask sum: 2658\nscore: 0.006927490234375 box: [265.42254638671875, 169.24215698242188, 278.1156005859375, 200.523193359375] mask sum: 271\nscore: 0.0068359375 box: [201.99871826171875, 81.15174865722656, 500.2926025390625, 405.01226806640625] mask sum: 2639\nscore: 0.006744384765625 box: [1.9151458740234375, 52.14794921875, 394.81597900390625, 508.17816162109375] mask sum: 65642\nscore: 0.006744384765625 box: [170.90560913085938, 14.118675231933594, 309.5041809082031, 201.97958374023438] mask sum: 11750\nscore: 0.00665283203125 box: [7.540863037109375, 76.74774169921875, 393.8564147949219, 514.7686157226562] mask sum: 92635\nscore: 0.00665283203125 box: [173.00857543945312, 55.34770965576172, 300.7406921386719, 201.07925415039062] mask sum: 10252\nscore: 0.00665283203125 box: [185.2319793701172, 22.178600311279297, 280.9238586425781, 82.91249084472656] mask sum: 9364\nscore: 0.006500244140625 box: [200.30519104003906, 36.76757049560547, 337.28936767578125, 202.09060668945312] mask sum: 2073\nscore: 0.006500244140625 box: [2.02294921875, 110.30609130859375, 291.3982849121094, 365.4830017089844] mask sum: 4557\nscore: 0.00634765625 box: [-16.105499267578125, 56.498382568359375, 383.6546325683594, 422.9211730957031] mask sum: 2647\nscore: 0.00634765625 box: [1.2881011962890625, 77.62992858886719, 342.5384521484375, 367.075439453125] mask sum: 1990\nscore: 0.00634765625 box: [53.99656677246094, -49.88690185546875, 377.47564697265625, 357.5660400390625] mask sum: 46275\nscore: 0.00634765625 box: [219.81039428710938, 146.3651580810547, 234.80780029296875, 197.7666778564453] mask sum: 506\nscore: 0.0062255859375 box: [277.0818786621094, 39.399986267089844, 349.3915100097656, 106.24785614013672] mask sum: 6210\nscore: 0.006072998046875 box: [133.76324462890625, 80.50335693359375, 457.15570068359375, 506.33917236328125] mask sum: 58178\nscore: 0.006072998046875 box: [28.746551513671875, 0.7191314697265625, 369.40069580078125, 309.41180419921875] mask sum: 16060\nscore: 0.006072998046875 box: [24.987197875976562, 54.03651428222656, 393.56903076171875, 513.4105834960938] mask sum: 87431\nscore: 0.005950927734375 box: [221.86427307128906, 145.27447509765625, 236.59068298339844, 169.35623168945312] mask sum: 149\nscore: 0.005950927734375 box: [4.330718994140625, 125.51986694335938, 287.5390930175781, 316.7004699707031] mask sum: 1493\nscore: 0.005859375 box: [-4.8802490234375, 67.0978012084961, 288.9441223144531, 202.70736694335938] mask sum: 1407\nscore: 0.005706787109375 box: [191.0941162109375, 108.56781768798828, 465.8948974609375, 336.5214538574219] mask sum: 1269\nscore: 0.005584716796875 box: [17.796554565429688, 82.99835205078125, 419.83123779296875, 510.75018310546875] mask sum: 72837\nscore: 0.005523681640625 box: [220.2388458251953, 148.69081115722656, 234.16603088378906, 199.6130828857422] mask sum: 493\nscore: 0.005523681640625 box: [26.258132934570312, 87.85771179199219, 399.2972412109375, 248.84812927246094] mask sum: 1289\nscore: 0.005462646484375 box: [171.89999389648438, 60.501853942871094, 294.3954772949219, 202.51092529296875] mask sum: 8319\nscore: 0.005462646484375 box: [168.13482666015625, 38.565921783447266, 352.65484619140625, 108.36311340332031] mask sum: 5446\nscore: 0.005340576171875 box: [204.5731201171875, 73.44010925292969, 485.9747314453125, 323.23236083984375] mask sum: 1255\nscore: 0.005279541015625 box: [51.40826416015625, -15.305831909179688, 377.0464172363281, 375.73162841796875] mask sum: 51270\nscore: 0.005279541015625 box: [2.068084716796875, 98.73760986328125, 396.7982482910156, 520.5159912109375] mask sum: 85097\nscore: 0.005279541015625 box: [243.43930053710938, 178.3601531982422, 276.6225280761719, 201.4810028076172] mask sum: 399\nscore: 0.005096435546875 box: [208.25389099121094, 45.89643859863281, 358.82708740234375, 199.9040985107422] mask sum: 1446\nscore: 0.005096435546875 box: [-2.3240203857421875, 114.26895904541016, 286.4075927734375, 265.60028076171875] mask sum: 1431\nscore: 0.005035400390625 box: [168.92953491210938, 52.34346008300781, 300.7051696777344, 201.6844482421875] mask sum: 10649\nscore: 0.0048828125 box: [191.33154296875, 142.65960693359375, 279.3047180175781, 202.61737060546875] mask sum: 1642\nscore: 0.0048828125 box: [141.5348358154297, -5.323585510253906, 371.82293701171875, 204.929443359375] mask sum: 22817\nscore: 0.0048828125 box: [250.8468475341797, 176.1415252685547, 276.7733459472656, 200.8567657470703] mask sum: 365\nscore: 0.004730224609375 box: [220.2487030029297, 145.93603515625, 232.72999572753906, 167.47195434570312] mask sum: 159\nscore: 0.004730224609375 box: [139.3280029296875, -18.065521240234375, 373.25885009765625, 221.4282989501953] mask sum: 26461\nscore: 0.004669189453125 box: [166.78436279296875, 56.547943115234375, 173.21630859375, 71.62117004394531] mask sum: 274\nscore: 0.004669189453125 box: [173.01358032226562, 67.70161437988281, 189.5699462890625, 103.82615661621094] mask sum: 608\nscore: 0.004608154296875 box: [215.29884338378906, 141.2568817138672, 224.5354461669922, 155.12522888183594] mask sum: 55\nscore: 0.0045166015625 box: [9.380508422851562, 79.59033966064453, 272.65478515625, 202.48471069335938] mask sum: 1981\nscore: 0.0045166015625 box: [67.37405395507812, 160.15158081054688, 396.50762939453125, 502.9623718261719] mask sum: 25412\nscore: 0.004486083984375 box: [215.16592407226562, 139.15248107910156, 224.93927001953125, 155.1073455810547] mask sum: 56\nscore: 0.00439453125 box: [189.117431640625, 142.6996307373047, 274.96844482421875, 203.45091247558594] mask sum: 1768\nscore: 0.00433349609375 box: [133.3084716796875, -13.852409362792969, 374.0133056640625, 228.10610961914062] mask sum: 27162\nscore: 0.004241943359375 box: [219.75692749023438, 148.2958526611328, 230.29898071289062, 182.72044372558594] mask sum: 317\nscore: 0.004241943359375 box: [268.46240234375, 170.5386199951172, 278.39752197265625, 197.5727996826172] mask sum: 251\nscore: 0.004241943359375 box: [234.66806030273438, 183.05926513671875, 276.3635559082031, 203.2698974609375] mask sum: 329\nscore: 0.004119873046875 box: [197.45132446289062, 117.503662109375, 440.7245788574219, 326.8880615234375] mask sum: 1269\nscore: 0.003997802734375 box: [222.12733459472656, 166.3865966796875, 235.43333435058594, 199.35525512695312] mask sum: 216\nscore: 0.003997802734375 box: [314.22369384765625, 1.8011608123779297, 344.56756591796875, 26.65902328491211] mask sum: 631\nscore: 0.00396728515625 box: [88.96940612792969, 129.88729858398438, 255.06971740722656, 209.98468017578125] mask sum: 1271\nscore: 0.0038909912109375 box: [67.9333724975586, 124.11688995361328, 279.4471130371094, 205.48153686523438] mask sum: 1289\nscore: 0.0038299560546875 box: [209.96107482910156, 86.74472045898438, 368.68023681640625, 201.22100830078125] mask sum: 1283\nscore: 0.0037689208984375 box: [372.8741760253906, 77.24266052246094, 440.3760681152344, 109.58154296875] mask sum: 2764\nscore: 0.0037078857421875 box: [143.67654418945312, -4.7700958251953125, 372.7653503417969, 109.2872085571289] mask sum: 17039\nscore: 0.0037078857421875 box: [221.56134033203125, 146.25502014160156, 231.17904663085938, 162.6737823486328] mask sum: 105\nscore: 0.003662109375 box: [213.6550750732422, 141.0248260498047, 223.37095642089844, 159.12950134277344] mask sum: 59\nscore: 0.003662109375 box: [209.80807495117188, 33.76751708984375, 300.25555419921875, 202.48873901367188] mask sum: 9169\nscore: 0.0035858154296875 box: [223.09803771972656, 179.85382080078125, 236.13804626464844, 201.23968505859375] mask sum: 122\nscore: 0.0035858154296875 box: [213.239990234375, 138.65518188476562, 223.79977416992188, 153.80935668945312] mask sum: 54\nscore: 0.0035858154296875 box: [224.78317260742188, 146.42462158203125, 235.902587890625, 164.33700561523438] mask sum: 95\nscore: 0.0034942626953125 box: [184.7044219970703, 146.14805603027344, 265.450439453125, 210.2866668701172] mask sum: 1330\nscore: 0.0034942626953125 box: [288.09393310546875, -1.5733604431152344, 363.1307373046875, 101.93708801269531] mask sum: 7036\nscore: 0.0034027099609375 box: [298.01678466796875, 43.06596374511719, 343.33343505859375, 105.02520751953125] mask sum: 4474\nscore: 0.0034027099609375 box: [261.214599609375, 184.83644104003906, 279.5047607421875, 201.4004364013672] mask sum: 254\nscore: 0.0034027099609375 box: [215.05856323242188, 142.45089721679688, 224.52740478515625, 157.80953979492188] mask sum: 57\nscore: 0.0034027099609375 box: [310.4853210449219, 44.419342041015625, 343.7840881347656, 105.27488708496094] mask sum: 4030\nscore: 0.0034027099609375 box: [371.5401611328125, 75.12950897216797, 434.47503662109375, 110.42374420166016] mask sum: 2280\nscore: 0.0032806396484375 box: [220.71206665039062, 150.7830810546875, 231.17236328125, 179.90982055664062] mask sum: 399\nscore: 0.0032806396484375 box: [215.67820739746094, 28.554821014404297, 339.6208801269531, 108.50587463378906] mask sum: 5299\nscore: 0.003173828125 box: [155.89157104492188, 21.084300994873047, 363.4065246582031, 110.65716552734375] mask sum: 8040\nscore: 0.003173828125 box: [243.45745849609375, 47.11358642578125, 450.55035400390625, 170.59381103515625] mask sum: 3600\nscore: 0.0030975341796875 box: [248.5321044921875, 181.68165588378906, 276.588623046875, 200.41615295410156] mask sum: 316\nscore: 0.0030975341796875 box: [182.1639404296875, 148.31341552734375, 223.40158081054688, 204.08392333984375] mask sum: 241\nscore: 0.0030975341796875 box: [215.86080932617188, 139.18797302246094, 226.06454467773438, 154.19261169433594] mask sum: 55\nscore: 0.00299072265625 box: [4.142662048339844, 79.50199127197266, 92.69883728027344, 113.9867935180664] mask sum: 4390\nscore: 0.00299072265625 box: [75.46746826171875, 78.07437133789062, 126.59371948242188, 107.00102233886719] mask sum: 3650\nscore: 0.00299072265625 box: [313.7132263183594, 110.37705993652344, 468.8194885253906, 247.9614715576172] mask sum: 3916\nscore: 0.00299072265625 box: [226.1706085205078, 183.57354736328125, 238.5345001220703, 201.56491088867188] mask sum: 128\nscore: 0.00299072265625 box: [262.9842224121094, 43.35761642456055, 339.4216003417969, 106.39895629882812] mask sum: 5463\nscore: 0.0029144287109375 box: [227.9229736328125, 180.5500946044922, 241.9964599609375, 200.9269256591797] mask sum: 272\nscore: 0.0029144287109375 box: [138.52413940429688, 3.4509239196777344, 167.41656494140625, 45.051307678222656] mask sum: 729\nscore: 0.0028076171875 box: [229.81329345703125, 37.71196365356445, 324.47320556640625, 102.69253540039062] mask sum: 4158\nscore: 0.0027313232421875 box: [180.4775390625, 67.2593994140625, 272.5590515136719, 142.82020568847656] mask sum: 5879\nscore: 0.0027313232421875 box: [233.71951293945312, 40.02138900756836, 331.2793273925781, 107.84637451171875] mask sum: 3884\nscore: 0.002655029296875 box: [356.9698181152344, 69.99684143066406, 413.4177551269531, 111.94743347167969] mask sum: 2654\nscore: 0.002655029296875 box: [220.23110961914062, 153.54347229003906, 229.5672607421875, 185.30677795410156] mask sum: 305\nscore: 0.002655029296875 box: [292.9447021484375, 64.4153823852539, 337.44989013671875, 105.16101837158203] mask sum: 3701\nscore: 0.002655029296875 box: [168.14772033691406, 60.34458923339844, 188.12644958496094, 90.41067504882812] mask sum: 1068\nscore: 0.0025634765625 box: [207.2880859375, 74.82769012451172, 324.094970703125, 204.6888427734375] mask sum: 5642\nscore: 0.0025634765625 box: [64.7085189819336, 67.40733337402344, 161.24887084960938, 107.73625183105469] mask sum: 4662\nscore: 0.0025634765625 box: [292.8930358886719, 46.770790100097656, 340.9911193847656, 103.1988754272461] mask sum: 5117\nscore: 0.0024871826171875 box: [111.04179382324219, 187.5470428466797, 161.27464294433594, 240.95372009277344] mask sum: 187\nscore: 0.0024871826171875 box: [293.400634765625, 23.976760864257812, 355.9381103515625, 103.0946044921875] mask sum: 6527\nscore: 0.002410888671875 box: [22.18478012084961, 84.51023864746094, 128.07546997070312, 125.14346313476562] mask sum: 5082\nscore: 0.0023345947265625 box: [305.2938232421875, 16.621753692626953, 357.09906005859375, 94.87324523925781] mask sum: 6491\nscore: 0.0023345947265625 box: [246.89187622070312, 8.314777374267578, 359.7217712402344, 94.95570373535156] mask sum: 6406\nscore: 0.0022735595703125 box: [312.85394287109375, 128.9266357421875, 437.11480712890625, 248.16513061523438] mask sum: 1183\nscore: 0.0022735595703125 box: [149.7207489013672, 144.53851318359375, 229.0164031982422, 202.21823120117188] mask sum: 425\nscore: 0.0022735595703125 box: [234.2997283935547, 185.80996704101562, 245.7577667236328, 199.3875732421875] mask sum: 153\nscore: 0.002197265625 box: [215.99989318847656, 145.2040557861328, 226.00062561035156, 168.8097686767578] mask sum: 92\nscore: 0.002197265625 box: [260.63201904296875, 39.130252838134766, 407.2529296875, 127.41928100585938] mask sum: 6444\nscore: 0.00213623046875 box: [141.9251708984375, 60.24268341064453, 202.83453369140625, 109.68558502197266] mask sum: 4704\nscore: 0.00213623046875 box: [136.73390197753906, 2.4336490631103516, 157.8429412841797, 37.40332794189453] mask sum: 552\nscore: 0.00213623046875 box: [335.3192138671875, 243.91482543945312, 381.39141845703125, 305.5293884277344] mask sum: 3348\nscore: 0.0020599365234375 box: [175.1236114501953, 51.61074447631836, 248.7631378173828, 101.65287780761719] mask sum: 4195\nscore: 0.0020599365234375 box: [161.51974487304688, 4.419577598571777, 193.49160766601562, 25.39287567138672] mask sum: 923\nscore: 0.0020599365234375 box: [104.1766586303711, 165.60118103027344, 152.5621337890625, 215.82725524902344] mask sum: 453\nscore: 0.0020599365234375 box: [180.04344177246094, 143.16058349609375, 218.6556854248047, 197.041748046875] mask sum: 150\nscore: 0.0020599365234375 box: [369.095703125, 137.13754272460938, 410.32171630859375, 198.1666259765625] mask sum: 968\nscore: 0.0020599365234375 box: [178.13821411132812, 129.86204528808594, 290.1624755859375, 202.75157165527344] mask sum: 1759\nscore: 0.0019989013671875 box: [265.6000671386719, 172.03958129882812, 279.3836364746094, 198.01715087890625] mask sum: 257\nscore: 0.0019989013671875 box: [262.66552734375, 183.15638732910156, 278.4093017578125, 200.57395935058594] mask sum: 257\nscore: 0.0019989013671875 box: [195.1213836669922, 40.88822937011719, 295.53070068359375, 197.8736572265625] mask sum: 3182\nscore: 0.0019989013671875 box: [250.79104614257812, 187.62123107910156, 276.7149353027344, 202.4787139892578] mask sum: 192\nscore: 0.00194549560546875 box: [138.58258056640625, 5.428230285644531, 160.274169921875, 43.88634490966797] mask sum: 617\nscore: 0.00194549560546875 box: [364.75518798828125, 71.83738708496094, 397.7413330078125, 107.63485717773438] mask sum: 2636\nscore: 0.0018310546875 box: [135.43833923339844, 19.338943481445312, 158.4320831298828, 48.043724060058594] mask sum: 518\nscore: 0.0018310546875 box: [162.9686279296875, 155.93539428710938, 235.55648803710938, 211.18295288085938] mask sum: 910\nscore: 0.0017242431640625 box: [131.7105255126953, 63.930572509765625, 212.6575469970703, 107.78950500488281] mask sum: 4353\nscore: 0.0017242431640625 box: [161.81344604492188, -4.008213043212891, 364.3970642089844, 88.02981567382812] mask sum: 9295\nscore: 0.0016632080078125 box: [305.92242431640625, 147.42251586914062, 343.1649169921875, 200.14218139648438] mask sum: 106\nscore: 0.0016632080078125 box: [262.0047912597656, 103.47358703613281, 354.4920959472656, 192.5225372314453] mask sum: 204\nscore: 0.00160980224609375 box: [197.66488647460938, 62.97290802001953, 213.6380615234375, 83.63280487060547] mask sum: 310\nscore: 0.00160980224609375 box: [202.44248962402344, 161.58070373535156, 216.71669006347656, 197.81617736816406] mask sum: 36\nscore: 0.00156402587890625 box: [320.6288146972656, 163.38552856445312, 342.7369079589844, 201.03375244140625] mask sum: 564\nscore: 0.00156402587890625 box: [229.36172485351562, 47.95014953613281, 251.98455810546875, 76.62337493896484] mask sum: 946\nscore: 0.00156402587890625 box: [270.2966003417969, 178.65269470214844, 281.3688659667969, 199.9905242919922] mask sum: 225\nscore: 0.00142669677734375 box: [195.6832275390625, 133.91111755371094, 212.24093627929688, 159.5318145751953] mask sum: 95\nscore: 0.00142669677734375 box: [268.1842041015625, 136.96356201171875, 302.3466796875, 190.56582641601562] mask sum: 180\nscore: 0.00138092041015625 box: [200.0205535888672, 61.26458740234375, 222.9907684326172, 90.61268615722656] mask sum: 1098\nscore: 0.00138092041015625 box: [216.92637634277344, 150.1756591796875, 227.30332946777344, 174.60403442382812] mask sum: 101\nscore: 0.00133514404296875 box: [138.35525512695312, 9.375988960266113, 157.309814453125, 36.99802017211914] mask sum: 423\nscore: 0.00130462646484375 box: [167.5035858154297, 26.70574378967285, 185.5756378173828, 57.570335388183594] mask sum: 303\nscore: 0.00130462646484375 box: [159.69613647460938, 138.97280883789062, 238.24673461914062, 197.02938842773438] mask sum: 650\nscore: 0.00130462646484375 box: [257.1180114746094, 5.218499183654785, 288.5801696777344, 33.098880767822266] mask sum: 89\nscore: 0.00118255615234375 box: [294.53582763671875, 55.27861785888672, 316.29681396484375, 96.10102081298828] mask sum: 5239\nscore: 0.00118255615234375 box: [313.71539306640625, 96.3214111328125, 327.3592529296875, 121.0347900390625] mask sum: 23\nscore: 0.00115203857421875 box: [234.58782958984375, 211.3808135986328, 288.403564453125, 237.0999298095703] mask sum: 87\nscore: 0.0011138916015625 box: [194.72152709960938, 45.964378356933594, 230.576416015625, 83.78812408447266] mask sum: 1862\nscore: 0.00107574462890625 box: [259.38116455078125, 150.52015686035156, 282.184814453125, 176.3201141357422] mask sum: 8\nscore: 0.00104522705078125 box: [314.8122253417969, -1.1250391006469727, 340.0259704589844, 27.221111297607422] mask sum: 2009\nscore: 0.00104522705078125 box: [251.544189453125, 169.25099182128906, 262.76385498046875, 186.5868682861328] mask sum: 454\nscore: 0.00104522705078125 box: [278.1011657714844, 177.4134521484375, 288.8266906738281, 191.844970703125] mask sum: 115\nscore: 0.00095367431640625 box: [280.9079284667969, 141.68069458007812, 291.3859558105469, 166.25836181640625] mask sum: 28\nscore: 0.00089263916015625 box: [291.9065856933594, 151.80889892578125, 309.7598571777344, 177.85232543945312] mask sum: 69\nscore: 0.00089263916015625 box: [91.28645324707031, -10.644107818603516, 114.4647216796875, 28.551162719726562] mask sum: 353\nscore: 0.00089263916015625 box: [288.1158447265625, 181.66961669921875, 296.960693359375, 196.7484130859375] mask sum: 110\nscore: 0.000865936279296875 box: [276.1146240234375, 181.94154357910156, 286.09576416015625, 195.9729461669922] mask sum: 226\nscore: 0.000865936279296875 box: [278.33001708984375, 102.59520721435547, 290.4019775390625, 127.68737030029297] mask sum: 169\nscore: 0.000865936279296875 box: [287.4483642578125, 95.50106048583984, 301.46478271484375, 119.89351654052734] mask sum: 442\nscore: 0.000865936279296875 box: [324.89788818359375, 46.32695007324219, 346.2679443359375, 87.12570190429688] mask sum: 2500\nscore: 0.000865936279296875 box: [362.5239562988281, -10.604569435119629, 391.2342834472656, 23.86044692993164] mask sum: 647\nscore: 0.000812530517578125 box: [281.4084167480469, 98.74417877197266, 297.6276550292969, 122.5300064086914] mask sum: 316\nscore: 0.000789642333984375 box: [210.611572265625, 10.884697914123535, 232.9180908203125, 40.58110427856445] mask sum: 585\nscore: 0.000789642333984375 box: [195.06671142578125, 109.55328369140625, 205.25802612304688, 126.29315185546875] mask sum: 50\nscore: 0.000743865966796875 box: [282.4155578613281, 182.13406372070312, 291.8461608886719, 197.1378173828125] mask sum: 129\nscore: 0.000743865966796875 box: [321.0473937988281, 51.998268127441406, 341.6907043457031, 84.32434844970703] mask sum: 418\nscore: 0.000720977783203125 box: [123.06906127929688, -15.907512664794922, 154.13510131835938, 31.976512908935547] mask sum: 353\nscore: 0.000698089599609375 box: [59.363807678222656, -4.880892753601074, 91.03087615966797, 36.363304138183594] mask sum: 135\nscore: 0.000698089599609375 box: [249.4128875732422, 10.00536823272705, 276.00042724609375, 27.831890106201172] mask sum: 208\nscore: 0.000675201416015625 box: [293.912353515625, 79.92479705810547, 307.7425537109375, 104.97713470458984] mask sum: 119\nscore: 0.000675201416015625 box: [225.8001708984375, 152.57887268066406, 237.82614135742188, 170.9886932373047] mask sum: 264\nscore: 0.000675201416015625 box: [276.1273498535156, 165.96835327148438, 286.1144714355469, 179.95770263671875] mask sum: 159\nscore: 0.000675201416015625 box: [303.0126953125, -2.999603271484375, 325.32122802734375, 26.27683448791504] mask sum: 290\nscore: 0.000576019287109375 box: [280.25555419921875, 190.64273071289062, 290.62408447265625, 201.54745483398438] mask sum: 179\nscore: 0.000545501708984375 box: [360.7256164550781, 6.3579254150390625, 397.8210144042969, 50.36011505126953] mask sum: 4\nscore: 0.00052642822265625 box: [307.50439453125, 163.4472198486328, 316.8995361328125, 178.50550842285156] mask sum: 183\nscore: 0.0004634857177734375 box: [307.7139892578125, 102.52916717529297, 322.74786376953125, 124.30582427978516] mask sum: 80\nscore: 0.0004634857177734375 box: [194.11990356445312, 125.6272201538086, 205.76702880859375, 143.8118438720703] mask sum: 78\nscore: 0.0004520416259765625 box: [300.5077819824219, 157.76565551757812, 312.1982727050781, 172.39410400390625] mask sum: 176\nscore: 0.0004100799560546875 box: [261.04266357421875, 109.77787780761719, 278.6678466796875, 126.64164733886719] mask sum: 12\nscore: 0.0004100799560546875 box: [233.12844848632812, 192.27952575683594, 256.72381591796875, 205.39161682128906] mask sum: 321\n",
+      "stderr": "",
+      "code_exec_success": true,
+      "exec_wall_time": 1.0026426315307617,
+      "sim_steps_delta": 0,
+      "tool_calls_delta": {
+        "get_observation": 1,
+        "segment_sam3_text_prompt": 1
+      },
+      "exec_record": {
+        "exec_ok": true,
+        "exception": null,
+        "error_line": null,
+        "tool_calls": {
+          "get_observation": 1,
+          "segment_sam3_text_prompt": 1
+        },
+        "motion_calls": {
+          "move_to_joints": 0,
+          "open_gripper": 0,
+          "close_gripper": 0
+        },
+        "num_motion_calls": 0,
+        "sim_steps_delta": 0,
+        "proprio_before": {
+          "eef_xyz": [
+            0.5175,
+            -0.0286,
+            0.1469
+          ],
+          "gripper_opening": 0.428
+        },
+        "proprio_after": {
+          "eef_xyz": [
+            0.5175,
+            -0.0286,
+            0.1469
+          ],
+          "gripper_opening": 0.428
+        },
+        "gripper_events": []
+      },
+      "proprio_before": {
+        "eef_xyz": [
+          0.5175,
+          -0.0286,
+          0.1469
+        ],
+        "gripper_opening": 0.428
+      },
+      "proprio_after": {
+        "eef_xyz": [
+          0.5175,
+          -0.0286,
+          0.1469
+        ],
+        "gripper_opening": 0.428
+      },
+      "turn_eval_success": true,
+      "turn_eval_reward": 1.0,
+      "vdm_prompt": null,
+      "vdm_output": "Zero-Motion Gate: no robot motion primitive (move_to_joints / open_gripper / close_gripper) was executed this turn (the code ran without exception but called no motion primitive). The scene is physically unchanged since the previous observation, so no new visual assessment was requested.\nThe earlier NOT COMPLETE verdict (VDM after turn 0) has EXPIRED and is not repeated, because it may be stale.\nCurrent robot state: the gripper is closed at opening 0.43 (an object is between the fingers) with the end-effector at z = +0.147 m. Zero motion occurred because the code ran without exception but called no motion primitive; a grasp-planning failure can mean the object is already held in the gripper.\nVerdict: UNCERTAIN \u2014 Verify whether the goal is already met (e.g. inspect the current observation and proprioception) before re-planning a grasp; do not open the gripper or re-grasp an object that is already held.",
+      "vdm_call_index": null,
+      "vdm_skipped_by_gate": true,
+      "vdm_verdict": "UNCERTAIN",
+      "vdm_verdict_source": "gate",
+      "step3_feedback": "[Execution & Proprioception Record]\n- Code execution: completed without exception\n- Robot motion calls this turn: none\n- Perception/planning calls this turn: get_observation\u00d71, segment_sam3_text_prompt\u00d71\n- Simulator steps this turn: 0\n- End-effector xyz (robot base frame, m): before [+0.517, -0.029, +0.147] -> after [+0.517, -0.029, +0.147] (\u0394 [+0.000, +0.000, +0.000])\n- Gripper opening (1.0 = fully open, 0.0 = fully closed with nothing between the fingers): before 0.43 -> after 0.43\n[Visual Differencing Assessment]\nZero-Motion Gate: no robot motion primitive (move_to_joints / open_gripper / close_gripper) was executed this turn (the code ran without exception but called no motion primitive). The scene is physically unchanged since the previous observation, so no new visual assessment was requested.\nThe earlier NOT COMPLETE verdict (VDM after turn 0) has EXPIRED and is not repeated, because it may be stale.\nCurrent robot state: the gripper is closed at opening 0.43 (an object is between the fingers) with the end-effector at z = +0.147 m. Zero motion occurred because the code ran without exception but called no motion primitive; a grasp-planning failure can mean the object is already held in the gripper.\nVerdict: UNCERTAIN \u2014 Verify whether the goal is already met (e.g. inspect the current observation and proprioception) before re-planning a grasp; do not open the gripper or re-grasp an object that is already held.",
+      "decision_after": "finish",
+      "decision_call_index": 7,
+      "decision_raw_response": "FINISH",
+      "turn_wall_time": 2.6006603240966797
+    }
+  ],
+  "model_calls": [
+    {
+      "role": "vdm",
+      "purpose": "vdm_initial",
+      "turn_idx": 0,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2196,
+      "output_tokens": 99,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 0,
+      "estimated_input_tokens": 2896,
+      "latency_s": 0.0,
+      "http_attempts": 0,
+      "finish_reason": "replayed",
+      "ok": true,
+      "error": null,
+      "replayed": true
+    },
+    {
+      "role": "coding",
+      "purpose": "initial_code",
+      "turn_idx": 0,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 1895,
+      "output_tokens": 813,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 0,
+      "estimated_input_tokens": 2579,
+      "latency_s": 0.0,
+      "http_attempts": 0,
+      "finish_reason": "replayed",
+      "ok": true,
+      "error": null,
+      "replayed": true
+    },
+    {
+      "role": "vdm",
+      "purpose": "vdm_diff_ours",
+      "turn_idx": 0,
+      "model": "qwen3.8-flash",
+      "model_returned": "qwen3.8-flash",
+      "input_tokens": 2984,
+      "output_tokens": 127,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 0,
+      "estimated_input_tokens": 3933,
+      "latency_s": 0.0,
+      "http_attempts": 0,
+      "finish_reason": "replayed",
+      "ok": true,
+      "error": null,
+      "replayed": true
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 0,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 3226,
+      "output_tokens": 746,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 3829,
+      "latency_s": 4.742012023925781,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null,
+      "replayed": false
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 1,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 4258,
+      "output_tokens": 176,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 4670,
+      "latency_s": 2.466477394104004,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null,
+      "replayed": false
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 2,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 4425,
+      "output_tokens": 176,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 4846,
+      "latency_s": 2.299222946166992,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null,
+      "replayed": false
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 3,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 4592,
+      "output_tokens": 125,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 5022,
+      "latency_s": 2.0757553577423096,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null,
+      "replayed": false
+    },
+    {
+      "role": "coding",
+      "purpose": "multi_turn_decision",
+      "turn_idx": 4,
+      "model": "deepseek-v4.1-flash-1017",
+      "model_returned": "deepseek-v4.1-flash-1017",
+      "input_tokens": 15355,
+      "output_tokens": 3,
+      "reasoning_tokens": null,
+      "max_tokens_requested": 8192,
+      "estimated_input_tokens": 13103,
+      "latency_s": 1.474459171295166,
+      "http_attempts": 1,
+      "finish_reason": "stop",
+      "ok": true,
+      "error": null,
+      "replayed": false
+    }
+  ],
+  "costs": {
+    "num_code_executions": 5,
+    "coding_llm_calls": 6,
+    "coding_input_tokens": 33751,
+    "coding_output_tokens": 2039,
+    "vdm_calls": 2,
+    "vdm_input_tokens": 5180,
+    "vdm_output_tokens": 226,
+    "vdm_gate_skips": 4,
+    "total_model_calls": 8,
+    "total_tokens": 41196,
+    "tool_calls": {
+      "get_observation": 5,
+      "segment_sam3_text_prompt": 5,
+      "segment_sam3_point_prompt": 0,
+      "point_prompt_molmo": 0,
+      "plan_grasp": 4,
+      "solve_ik": 3,
+      "move_to_joints": 3,
+      "open_gripper": 1,
+      "close_gripper": 1,
+      "get_oriented_bounding_box_from_3d_points": 0
+    },
+    "extra_perception_calls": 9,
+    "total_sim_steps": 212,
+    "total_wall_time": 57.91711902618408,
+    "reset_wall_time": 0.5337603092193604
+  },
+  "evaluation": {
+    "official_task_success": true,
+    "official_reward": 1.0,
+    "episode_code_exec_success_rate": 0.4
+  }
+}

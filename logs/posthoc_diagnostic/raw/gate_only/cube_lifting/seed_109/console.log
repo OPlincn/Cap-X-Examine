@@ -1,0 +1,97 @@
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python /home/oplin/PythonProjects/cap-task/cap-x/capx/third_party/robosuite/robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:32)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly, otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:42)
+R1Pro not installed, skipping R1Pro APIs
+LIBERO not installed!
+R1Pro not installed!
+API server on 127.0.0.1:8114 already running, skipping
+API server on 127.0.0.1:8115 already running, skipping
+API server on 127.0.0.1:8116 already running, skipping
+[robosuite INFO] Loading controller configuration from: capx/integrations/robosuite/controllers/config/robots/panda_joint_ctrl.json (composite_controller_factory.py:121)
+init franka control api
+init grasp net plan fn
+init sam3 seg fn
+Running Trials:   0%|          | 0/1 [00:00<?, ?it/s]Time taken to query model: 7.68 seconds
+Time taken to query model: 2.92 seconds
+Time taken to query model: 8.66 seconds
+Time taken to query model: 0.82 seconds
+Model chose to finish
+Code blocks done
+Saved interaction video to logs/posthoc_diagnostic/raw/gate_only/cube_lifting/seed_109/trial_109_sandboxrc_0_reward_1.000_taskcompleted_1/video_turn_00.mp4 (80 frames)
+Saved interaction video to logs/posthoc_diagnostic/raw/gate_only/cube_lifting/seed_109/trial_109_sandboxrc_0_reward_1.000_taskcompleted_1/video_combined.mp4 (81 frames)
+Trial 109 took 24.55 seconds
+Running Trials: 100%|██████████| 1/1 [00:24<00:00, 24.69s/it]Running Trials: 100%|██████████| 1/1 [00:24<00:00, 24.69s/it]
+----------------------------------------------------------------------------------------------------
+Generated program:
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_pose = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T = grasp_poses[best_idx]
+
+grasp_world = cam_pose @ best_T
+pos = grasp_world[:3, :3]
+# approach from above: use grasp position, orientation pointing down
+target_pos = grasp_world[:3, 3]
+
+# pre-grasp above
+pre_pos = target_pos.copy()
+pre_pos[2] += 0.10
+
+# downward orientation quaternion (wxyz): rotate 180 about x -> gripper pointing down
+quat_down = np.array([0.0, 1.0, 0.0, 0.0])
+
+open_gripper()
+joints = solve_ik(pre_pos, quat_down)
+move_to_joints(joints)
+
+joints = solve_ik(target_pos, quat_down)
+move_to_joints(joints)
+
+close_gripper()
+
+lift_pos = target_pos.copy()
+lift_pos[2] += 0.15
+joints = solve_ik(lift_pos, quat_down)
+move_to_joints(joints)
+
+
+Environment response:
+  Sandbox failed: 0
+  Stdout: 
+  Stderr: 
+  Reward: 1.0
+  Task Completed: True
+  Terminated: True, Truncated: False
+  Num Regenerations: 0
+  Num Finishes: 1
+  Num Code Blocks: 1
+----------------------------------------------------------------------------------------------------
+Code saved to logs/posthoc_diagnostic/raw/gate_only/cube_lifting/seed_109/trial_109_sandboxrc_0_reward_1.000_taskcompleted_1/code.py
+
+Summary Statistics:
+Model: deepseek-v4.1-flash-1017
+Visual Differencing Model: qwen3.8-flash
+Config Path: env_configs/harness_eval/cube_lifting.yaml
+Git Commit: e3aa502 (Dirty: True)
+Total number of trials: 1
+Code generation success rate / Average reward / Task completed: 
+1.000/1.000/1
+Average code blocks: 1.000
+Average regenerations: 0.000
+Average finishes: 1.000
+Elapsed time: 25.38 seconds

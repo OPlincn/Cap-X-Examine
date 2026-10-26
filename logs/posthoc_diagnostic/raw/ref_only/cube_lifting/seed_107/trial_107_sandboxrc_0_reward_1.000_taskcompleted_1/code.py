@@ -1,0 +1,47 @@
+# Code block 0
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+extrinsics = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask.astype(np.int32))
+best_idx = grasp_scores.argmax()
+best_T = grasp_poses[best_idx]
+
+grasp_world = extrinsics @ best_T
+pos = grasp_world[:3, 3]
+R = grasp_world[:3, :3]
+
+# Approach from above: use a top-down orientation (gripper pointing down)
+# Build quaternion for downward-facing gripper: rotate 180 deg about x-axis
+quat = np.array([0.0, 1.0, 0.0, 0.0])  # wxyz, 180 deg about x
+
+# Pre-grasp position above the cube
+pre_pos = pos.copy()
+pre_pos[2] += 0.10
+
+joints_pre = solve_ik(pre_pos, quat)
+move_to_joints(joints_pre)
+open_gripper()
+
+# Move down to grasp position
+joints_grasp = solve_ik(pos, quat)
+move_to_joints(joints_grasp)
+close_gripper()
+
+# Lift
+lift_pos = pos.copy()
+lift_pos[2] += 0.15
+joints_lift = solve_ik(lift_pos, quat)
+move_to_joints(joints_lift)
+
+print("Grasp position:", pos)
+print("Lift position:", lift_pos)

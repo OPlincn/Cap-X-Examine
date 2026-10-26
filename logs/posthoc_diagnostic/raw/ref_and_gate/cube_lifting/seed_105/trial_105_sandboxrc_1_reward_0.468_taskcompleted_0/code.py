@@ -1,0 +1,161 @@
+# Code block 0
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+print("rgb", rgb.shape, "depth", depth.shape)
+print("K", K)
+print("ext", ext)
+```
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+print("num masks", len(masks))
+for m in masks:
+    print(m.get("score"), m.get("box"))
+```
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+print("mask sum", mask.sum(), "box", best["box"])
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask.astype(np.int32))
+print("num grasps", len(grasp_scores))
+print("scores", grasp_scores[:10])
+```
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask.astype(np.int32))
+best_idx = int(grasp_scores.argmax())
+T_cam = grasp_poses[best_idx]
+T_world = ext @ T_cam
+print("best score", grasp_scores[best_idx])
+print("T_world\n", T_world)
+
+# approach from above: use position, keep gripper pointing down
+pos = T_world[:3, 3]
+print("pos", pos)
+
+# pre-grasp above
+pre = pos.copy()
+pre[2] += 0.10
+quat = np.array([0.0, 1.0, 0.0, 0.0])  # wxyz, gripper down
+open_gripper()
+j = solve_ik(pre, quat)
+move_to_joints(j)
+print("moved to pre-grasp")
+```
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask.astype(np.int32))
+best_idx = int(grasp_scores.argmax())
+T_world = ext @ grasp_poses[best_idx]
+pos = T_world[:3, 3]
+
+quat = np.array([0.0, 1.0, 0.0, 0.0])
+# descend to grasp
+j = solve_ik(pos, quat)
+move_to_joints(j)
+close_gripper()
+print("grasped at", pos)
+```
+```python
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask.astype(np.int32))
+best_idx = int(grasp_scores.argmax())
+T_world = ext @ grasp_poses[best_idx]
+pos = T_world[:3, 3]
+
+quat = np.array([0.0, 1.0, 0.0, 0.0])
+lift = pos.copy()
+lift[2] += 0.20
+j = solve_ik(lift, quat)
+move_to_joints(j)
+print("lifted to", lift)
+
+# Code block 1
+import numpy as np
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"]
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask.astype(np.int32))
+best_idx = int(grasp_scores.argmax())
+T_world = ext @ grasp_poses[best_idx]
+pos = T_world[:3, 3]
+print("grasp pos", pos)
+
+quat = np.array([0.0, 1.0, 0.0, 0.0])
+pre = pos.copy()
+pre[2] += 0.10
+open_gripper()
+j = solve_ik(pre, quat)
+move_to_joints(j)
+print("moved to pre-grasp")
+
+j = solve_ik(pos, quat)
+move_to_joints(j)
+close_gripper()
+print("grasped")
+
+lift = pos.copy()
+lift[2] += 0.20
+j = solve_ik(lift, quat)
+move_to_joints(j)
+print("lifted to", lift)

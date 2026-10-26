@@ -1,0 +1,71 @@
+[run] regime=matched variant=ref_only seed=102 -> logs/posthoc_diagnostic/matched/ref_only/cube_lifting/seed_102
+[done] regime=matched variant=ref_only seed=102 exit=0
+[run] regime=matched variant=gate_only seed=102 -> logs/posthoc_diagnostic/matched/gate_only/cube_lifting/seed_102
+[done] regime=matched variant=gate_only seed=102 exit=0
+[run] regime=matched variant=ref_and_gate seed=102 -> logs/posthoc_diagnostic/matched/ref_and_gate/cube_lifting/seed_102
+[done] regime=matched variant=ref_and_gate seed=102 exit=0
+[run] regime=matched variant=ref_only seed=107 -> logs/posthoc_diagnostic/matched/ref_only/cube_lifting/seed_107
+[done] regime=matched variant=ref_only seed=107 exit=0
+[run] regime=matched variant=gate_only seed=107 -> logs/posthoc_diagnostic/matched/gate_only/cube_lifting/seed_107
+[done] regime=matched variant=gate_only seed=107 exit=0
+[run] regime=matched variant=ref_and_gate seed=107 -> logs/posthoc_diagnostic/matched/ref_and_gate/cube_lifting/seed_107
+[done] regime=matched variant=ref_and_gate seed=107 exit=0
+[run] regime=matched variant=ref_only seed=109 -> logs/posthoc_diagnostic/matched/ref_only/cube_lifting/seed_109
+[done] regime=matched variant=ref_only seed=109 exit=0
+[run] regime=matched variant=gate_only seed=109 -> logs/posthoc_diagnostic/matched/gate_only/cube_lifting/seed_109
+[done] regime=matched variant=gate_only seed=109 exit=0
+[run] regime=matched variant=ref_and_gate seed=109 -> logs/posthoc_diagnostic/matched/ref_and_gate/cube_lifting/seed_109
+[done] regime=matched variant=ref_and_gate seed=109 exit=0
+[run] regime=matched variant=ref_only seed=110 -> logs/posthoc_diagnostic/matched/ref_only/cube_lifting/seed_110
+[done] regime=matched variant=ref_only seed=110 exit=0
+[skip] logs/posthoc_diagnostic/matched/gate_only/cube_lifting/seed_110 already has an episode log (no reruns)
+[run] regime=matched variant=ref_and_gate seed=110 -> logs/posthoc_diagnostic/matched/ref_and_gate/cube_lifting/seed_110
+[done] regime=matched variant=ref_and_gate seed=110 exit=0
+[run] regime=matched variant=ref_only seed=114 -> logs/posthoc_diagnostic/matched/ref_only/cube_lifting/seed_114
+[done] regime=matched variant=ref_only seed=114 exit=0
+[run] regime=matched variant=gate_only seed=114 -> logs/posthoc_diagnostic/matched/gate_only/cube_lifting/seed_114
+[done] regime=matched variant=gate_only seed=114 exit=0
+[run] regime=matched variant=ref_and_gate seed=114 -> logs/posthoc_diagnostic/matched/ref_and_gate/cube_lifting/seed_114
+[done] regime=matched variant=ref_and_gate seed=114 exit=0
+[run] regime=matched variant=ref_only seed=116 -> logs/posthoc_diagnostic/matched/ref_only/cube_lifting/seed_116
+[done] regime=matched variant=ref_only seed=116 exit=0
+[run] regime=matched variant=gate_only seed=116 -> logs/posthoc_diagnostic/matched/gate_only/cube_lifting/seed_116
+[done] regime=matched variant=gate_only seed=116 exit=0
+[run] regime=matched variant=ref_and_gate seed=116 -> logs/posthoc_diagnostic/matched/ref_and_gate/cube_lifting/seed_116
+[done] regime=matched variant=ref_and_gate seed=116 exit=0
+[run] regime=raw variant=ref_only seed=102 -> logs/posthoc_diagnostic/raw/ref_only/cube_lifting/seed_102
+[done] regime=raw variant=ref_only seed=102 exit=0
+[run] regime=raw variant=gate_only seed=102 -> logs/posthoc_diagnostic/raw/gate_only/cube_lifting/seed_102
+[done] regime=raw variant=gate_only seed=102 exit=0
+[run] regime=raw variant=ref_and_gate seed=102 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_102
+[done] regime=raw variant=ref_and_gate seed=102 exit=0
+[run] regime=raw variant=ref_only seed=107 -> logs/posthoc_diagnostic/raw/ref_only/cube_lifting/seed_107
+[done] regime=raw variant=ref_only seed=107 exit=0
+[run] regime=raw variant=gate_only seed=107 -> logs/posthoc_diagnostic/raw/gate_only/cube_lifting/seed_107
+[done] regime=raw variant=gate_only seed=107 exit=0
+[run] regime=raw variant=ref_and_gate seed=107 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_107
+[done] regime=raw variant=ref_and_gate seed=107 exit=0
+[run] regime=raw variant=ref_only seed=109 -> logs/posthoc_diagnostic/raw/ref_only/cube_lifting/seed_109
+[done] regime=raw variant=ref_only seed=109 exit=0
+[run] regime=raw variant=gate_only seed=109 -> logs/posthoc_diagnostic/raw/gate_only/cube_lifting/seed_109
+[done] regime=raw variant=gate_only seed=109 exit=0
+[run] regime=raw variant=ref_and_gate seed=109 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_109
+[done] regime=raw variant=ref_and_gate seed=109 exit=0
+[run] regime=raw variant=ref_only seed=110 -> logs/posthoc_diagnostic/raw/ref_only/cube_lifting/seed_110
+[done] regime=raw variant=ref_only seed=110 exit=0
+[run] regime=raw variant=gate_only seed=110 -> logs/posthoc_diagnostic/raw/gate_only/cube_lifting/seed_110
+[done] regime=raw variant=gate_only seed=110 exit=0
+[run] regime=raw variant=ref_and_gate seed=110 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_110
+[done] regime=raw variant=ref_and_gate seed=110 exit=0
+[run] regime=raw variant=ref_only seed=114 -> logs/posthoc_diagnostic/raw/ref_only/cube_lifting/seed_114
+[done] regime=raw variant=ref_only seed=114 exit=0
+[run] regime=raw variant=gate_only seed=114 -> logs/posthoc_diagnostic/raw/gate_only/cube_lifting/seed_114
+[done] regime=raw variant=gate_only seed=114 exit=0
+[run] regime=raw variant=ref_and_gate seed=114 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_114
+[done] regime=raw variant=ref_and_gate seed=114 exit=0
+[run] regime=raw variant=ref_only seed=116 -> logs/posthoc_diagnostic/raw/ref_only/cube_lifting/seed_116
+[done] regime=raw variant=ref_only seed=116 exit=0
+[run] regime=raw variant=gate_only seed=116 -> logs/posthoc_diagnostic/raw/gate_only/cube_lifting/seed_116
+[done] regime=raw variant=gate_only seed=116 exit=0
+[run] regime=raw variant=ref_and_gate seed=116 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_116
+[done] regime=raw variant=ref_and_gate seed=116 exit=0

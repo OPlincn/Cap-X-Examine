@@ -1,0 +1,42 @@
+```python
+import numpy as np
+
+obs = get_observation()
+cam = obs["robot0_robotview"]
+rgb = cam["images"]["rgb"]
+depth = cam["images"]["depth"]
+K = cam["intrinsics"]
+cam_ext = cam["pose_mat"]
+
+masks = segment_sam3_text_prompt(rgb, text_prompt="red cube")
+best = max(masks, key=lambda d: d["score"])
+mask = best["mask"].astype(np.int32)
+
+grasp_poses, grasp_scores = plan_grasp(depth=depth, intrinsics=K, segmentation=mask)
+best_idx = int(np.argmax(grasp_scores))
+best_T_cam = grasp_poses[best_idx]
+best_T_world = cam_ext @ best_T_cam
+
+pos = best_T_world[:3, 3]
+# approach from above: use identity-ish orientation pointing down
+quat = np.array([0.0, 1.0, 0.0, 0.0])  # wxyz, gripper pointing down
+
+# pre-grasp above
+pre = pos.copy()
+pre[2] += 0.10
+joints_pre = solve_ik(pre, quat)
+move_to_joints(joints_pre)
+open_gripper()
+
+# descend to grasp
+joints_grasp = solve_ik(pos, quat)
+move_to_joints(joints_grasp)
+close_gripper()
+
+# lift
+lift = pos.copy()
+lift[2] += 0.15
+joints_lift = solve_ik(lift, quat)
+move_to_joints(joints_lift)
+print("done", pos)
+```

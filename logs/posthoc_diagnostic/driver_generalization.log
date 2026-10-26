@@ -1,0 +1,28 @@
+[run] regime=raw variant=ref_and_gate seed=100 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_100
+[done] regime=raw variant=ref_and_gate seed=100 exit=0
+[run] regime=raw variant=ref_and_gate seed=101 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_101
+[done] regime=raw variant=ref_and_gate seed=101 exit=0
+[run] regime=raw variant=ref_and_gate seed=103 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_103
+[done] regime=raw variant=ref_and_gate seed=103 exit=0
+[run] regime=raw variant=ref_and_gate seed=104 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_104
+[done] regime=raw variant=ref_and_gate seed=104 exit=0
+[run] regime=raw variant=ref_and_gate seed=105 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_105
+[done] regime=raw variant=ref_and_gate seed=105 exit=0
+[run] regime=raw variant=ref_and_gate seed=106 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_106
+[done] regime=raw variant=ref_and_gate seed=106 exit=0
+[run] regime=raw variant=ref_and_gate seed=108 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_108
+[done] regime=raw variant=ref_and_gate seed=108 exit=0
+[run] regime=raw variant=ref_and_gate seed=111 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_111
+[done] regime=raw variant=ref_and_gate seed=111 exit=0
+[run] regime=raw variant=ref_and_gate seed=112 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_112
+[done] regime=raw variant=ref_and_gate seed=112 exit=0
+[run] regime=raw variant=ref_and_gate seed=113 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_113
+[done] regime=raw variant=ref_and_gate seed=113 exit=0
+[run] regime=raw variant=ref_and_gate seed=115 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_115
+[done] regime=raw variant=ref_and_gate seed=115 exit=0
+[run] regime=raw variant=ref_and_gate seed=117 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_117
+[done] regime=raw variant=ref_and_gate seed=117 exit=0
+[run] regime=raw variant=ref_and_gate seed=118 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_118
+[done] regime=raw variant=ref_and_gate seed=118 exit=0
+[run] regime=raw variant=ref_and_gate seed=119 -> logs/posthoc_diagnostic/raw/ref_and_gate/cube_lifting/seed_119
+[done] regime=raw variant=ref_and_gate seed=119 exit=0

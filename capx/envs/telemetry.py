@@ -111,6 +111,7 @@ class ModelCallRecord:
     finish_reason: str | None
     ok: bool
     error: str | None = None
+    replayed: bool = False
 
 
 _ACTIVE: contextvars.ContextVar[EpisodeTelemetry | None] = contextvars.ContextVar(
@@ -177,6 +178,9 @@ class EpisodeTelemetry:
         # Optional ``() -> dict`` reading robot proprioception, called right after gripper
         # commands; readings are appended to ``tool_events`` (logged, used by EG-VDM).
         self.post_gripper_hook: Callable[[], dict[str, Any] | None] | None = None
+        # Post-hoc turn-0 matching: {(purpose, turn_idx): {"content", "input_tokens", ...}}
+        self.replay: dict[tuple[str, int], dict[str, Any]] = {}
+        self.posthoc: dict[str, Any] | None = None
         self.tool_events: list[dict[str, Any]] = []
         self._token = None
 
@@ -306,6 +310,44 @@ class EpisodeTelemetry:
         out["_usage_charged"] = {"input_tokens": in_tok, "output_tokens": out_tok}
         return out
 
+    def record_replayed(
+        self,
+        args: Any,
+        prompt: list[dict[str, Any]],
+        replay: dict[str, Any],
+        *,
+        role: str,
+        purpose: str,
+        turn_idx: int | None,
+    ) -> dict[str, Any]:
+        """Return a logged response from an earlier run instead of querying the model.
+
+        Used only by post-hoc turn-0 matching. The logged token usage is charged against the
+        budget exactly as the original call was, so budgets stay comparable.
+        """
+        if self.num_model_calls >= self.budget.max_model_calls:
+            raise self._exceed("max_model_calls", f"{self.num_model_calls} calls")
+        est_in = _estimate_prompt_tokens(prompt)
+        in_tok, out_tok = replay.get("input_tokens"), replay.get("output_tokens")
+        self.model_calls.append(
+            ModelCallRecord(
+                role=role, purpose=purpose, turn_idx=turn_idx, model=args.model,
+                model_returned=replay.get("model_returned"), input_tokens=in_tok,
+                output_tokens=out_tok, reasoning_tokens=None, max_tokens_requested=0,
+                estimated_input_tokens=est_in, latency_s=0.0, http_attempts=0,
+                finish_reason="replayed", ok=True, replayed=True,
+            )
+        )
+        if self.total_tokens > self.budget.max_total_tokens:
+            raise self._exceed("max_total_tokens", f"used {self.total_tokens}")
+        return {
+            "content": replay["content"],
+            "reasoning": None,
+            "usage": {"prompt_tokens": in_tok, "completion_tokens": out_tok},
+            "model_returned": replay.get("model_returned"),
+            "_usage_charged": {"input_tokens": in_tok, "output_tokens": out_tok},
+        }
+
     # ------------------------------------------------------------------ #
     # Tool calls
     # ------------------------------------------------------------------ #
@@ -375,6 +417,7 @@ class EpisodeTelemetry:
             "termination_detail": self.termination_detail,
             "timeout_or_budget_exceeded": timeout_or_budget,
             "budget_exceeded": self.budget_exceeded,
+            "posthoc": self.posthoc,
             "turns": self.turns,
             "model_calls": calls,
             "costs": {

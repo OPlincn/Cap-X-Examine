@@ -1,0 +1,47 @@
+cube_lifting  seed=0   SUCCESS turns=8  end=finish           tags=-
+    t0: ok=True  steps=211  vdm_done=False next=regenerate exc=None
+    t1: ok=True  steps=135  vdm_done=False next=regenerate exc=None
+    t2: ok=True  steps=110  vdm_done=False next=regenerate exc=None
+    t3: ok=True  steps=117  vdm_done=False next=regenerate exc=None
+    t4: ok=True  steps=111  vdm_done=False next=regenerate exc=None
+    t5: ok=True  steps=168  vdm_done=False next=regenerate exc=None
+    t6: ok=True  steps=158  vdm_done=False next=regenerate exc=None
+    t7: ok=True  steps=117  vdm_done=True  next=finish exc=None
+cube_lifting  seed=1   SUCCESS turns=4  end=finish           tags=C:vdm_on_zero_motion_crash x1
+    t0: ok=True  steps=204  vdm_done=False next=regenerate exc=None
+    t1: ok=False steps=0    vdm_done=False next=regenerate exc=AssertionError
+    t2: ok=True  steps=320  vdm_done=False next=regenerate exc=None
+    t3: ok=True  steps=153  vdm_done=False next=finish exc=None
+cube_lifting  seed=2   SUCCESS turns=5  end=finish           tags=C:vdm_on_zero_motion_crash x2, C:repeated_exception x1
+    t0: ok=True  steps=213  vdm_done=False next=regenerate exc=None
+    t1: ok=False steps=0    vdm_done=False next=regenerate exc=AssertionError
+    t2: ok=False steps=0    vdm_done=False next=regenerate exc=AssertionError
+    t3: ok=True  steps=131  vdm_done=False next=regenerate exc=None
+    t4: ok=True  steps=172  vdm_done=False next=finish exc=None
+cube_restack  seed=0   FAIL    turns=1  end=finish           tags=A:premature_finish, A:vdm_false_completion, C:vdm_on_zero_motion_crash x1
+    t0: ok=False steps=0    vdm_done=True  next=finish exc=SyntaxError: unterminated string literal (detected at line 48)
+cube_restack  seed=1   SUCCESS turns=4  end=finish           tags=C:vdm_on_zero_motion_crash x1
+    t0: ok=False steps=0    vdm_done=False next=regenerate exc=SyntaxError: unterminated string literal (detected at line 47)
+    t1: ok=True  steps=355  vdm_done=False next=regenerate exc=None
+    t2: ok=True  steps=225  vdm_done=True  next=regenerate exc=None
+    t3: ok=True  steps=30   vdm_done=True  next=finish exc=None
+cube_restack  seed=2   SUCCESS turns=2  end=finish           tags=C:vdm_on_zero_motion_crash x1
+    t0: ok=False steps=0    vdm_done=False next=regenerate exc=SyntaxError: invalid decimal literal
+    t1: ok=True  steps=471  vdm_done=False next=finish exc=None
+cube_stack    seed=0   SUCCESS turns=1  end=finish           tags=-
+    t0: ok=True  steps=215  vdm_done=True  next=finish exc=None
+cube_stack    seed=1   SUCCESS turns=3  end=finish           tags=C:vdm_on_zero_motion_crash x1
+    t0: ok=False steps=0    vdm_done=False next=regenerate exc=SyntaxError: invalid decimal literal
+    t1: ok=True  steps=216  vdm_done=False next=regenerate exc=None
+    t2: ok=True  steps=30   vdm_done=True  next=finish exc=None
+cube_stack    seed=2   SUCCESS turns=2  end=finish           tags=C:vdm_on_zero_motion_crash x1
+    t0: ok=False steps=0    vdm_done=False next=regenerate exc=SyntaxError: unterminated string literal (detected at line 49)
+    t1: ok=True  steps=268  vdm_done=False next=finish exc=None
+spill_wipe    seed=0   SUCCESS turns=1  end=finish           tags=-
+    t0: ok=True  steps=510  vdm_done=True  next=finish exc=None
+spill_wipe    seed=1   SUCCESS turns=2  end=finish           tags=C:vdm_on_zero_motion_crash x1
+    t0: ok=False steps=0    vdm_done=False next=regenerate exc=SyntaxError: invalid syntax
+    t1: ok=True  steps=190  vdm_done=True  next=finish exc=None
+spill_wipe    seed=2   SUCCESS turns=2  end=finish           tags=-
+    t0: ok=True  steps=280  vdm_done=False next=regenerate exc=None
+    t1: ok=True  steps=190  vdm_done=False next=finish exc=None
